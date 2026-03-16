@@ -3988,9 +3988,7 @@ A(s,a) = Q(s,a) - V(s)
 ```
 
 ```math
-
-abla_	heta J(\theta) pprox \mathbb{E}[A_t 
-abla_	heta \log \pi_\theta(a_t|s_t)]
+\nabla_\theta J(\theta) \approx \mathbb{E}[A_t \nabla_\theta \log \pi_\theta(a_t|s_t)]
 ```
 
 #### 必背术语
