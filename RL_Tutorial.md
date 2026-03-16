@@ -3682,9 +3682,7 @@ J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]
 ```
 
 ```math
-
-abla_	heta J(\theta) = \mathbb{E}[G_t 
-abla_	heta \log \pi_\theta(a_t|s_t)]
+\nabla_\theta J(\theta) = \mathbb{E}[G_t \nabla_\theta \log \pi_\theta(a_t|s_t)]
 ```
 
 #### 必背术语

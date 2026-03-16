@@ -214,7 +214,7 @@ public:
     path.pop_back();
   }
 
-private:
+protected:
   GraphNodes nodes_;
   GraphNodePtr start_node_;
 };
