@@ -8,6 +8,8 @@ void BuildGraph() {
   auto node_d = std::make_shared<GraphNode>("D", 0.0);
   auto node_e = std::make_shared<GraphNode>("E", 0.0);
 
+  LOG_INFO << "build dag.\n";
+
   AddNeighbor(node_a, node_b);
   AddNeighbor(node_b, node_e);
   AddNeighbor(node_b, node_c);
@@ -15,15 +17,25 @@ void BuildGraph() {
 
   AddNeighbor(node_a, node_c);
 
+  // new dag
   auto dag = DAG();
   dag.SetStartNode(node_a);
 
-  PrintSeperator();
+  // bfs
+  PrintSeperator("BFS");
   dag.BFS();
 
-  PrintSeperator();
+  // dfs
+  PrintSeperator("DFS");
   auto start_node = dag.GetStartNode();
   dag.DFS(start_node);
+
+  // find path
+  PrintSeperator("Path Finder");
+  auto path_list = dag.FindPathFromTo(node_a, node_d);
+  //   for (const auto &path : path_list) {
+  //     dag.PrintPath(path);
+  //   }
 }
 
 int main() { BuildGraph(); }

@@ -94,10 +94,11 @@ void VisitNode(const GraphNodePtr &node) {
 }
 
 // print seperator
-void PrintSeperator() {
-  std::cout << "-----------------------------" << std::endl;
+void PrintSeperator(const std::string str = "") {
+  std::cout << "---------------" << str << "--------------" << std::endl;
 }
 
+using GraphNodes = std::vector<GraphNodePtr>;
 using Path = std::vector<GraphNodePtr>;
 using PathList = std::vector<Path>;
 
@@ -139,12 +140,68 @@ public:
   }
 
   // find paths from start node to end node
-  PathList FindPathFromTo(const std::string &node_a,
-                          const std::string &node_b) {
+  PathList FindPathFromTo(const GraphNodePtr &node_a,
+                          const GraphNodePtr &node_b) {
     PathList path_list;
+
+    // early check
+    if (node_a.get() == nullptr || node_b.get() == nullptr) {
+      LOG_ERROR << "error, node_a or node_b is nullptr" << std::endl;
+      throw std::runtime_error("error, node_a or node_b is nullptr");
+      return path_list;
+    }
+
+    // find all path node_a and node_b in the DAG
+    Path path;
+    FindPath(start_node_, node_a, node_b, path_list, path);
+
     return path_list;
   }
 
+  // print a path
+  void PrintPath(const Path &path) {
+    LOG_INFO << "print path: \n";
+    for (const auto &node : path) {
+      LOG_INFO << "\t" << node->node_name_ << ", " << node->node_val_ << "\n";
+    }
+  }
+
+  void FindPath(const GraphNodePtr &node, const GraphNodePtr &node_a,
+                const GraphNodePtr &node_b, PathList &path_list, Path &path) {
+    // stop recursion
+    if (node->node_name_ == node_b->node_name_) {
+      if (!path.empty() && path.front()->node_name_ == node_a->node_name_) {
+        // push end node of path
+        path.push_back(node);
+
+        // save this path
+        path_list.push_back(path);
+      } else {
+        LOG_ERROR << "error, path is empty or path's first node is not node_a, "
+                     "invalid path"
+                  << std::endl;
+      }
+
+      // return anyway
+      return;
+    }
+
+    if (node->node_name_ == node_a->node_name_) {
+      // push start node of path
+      path.push_back(node);
+    } else if (!path.empty()) {
+      // push path node
+      path.push_back(node);
+    }
+
+    // find recursively
+    for (const auto &adj_node : node->neighbors_) {
+      FindPath(adj_node, node_a, node_b, path_list, path);
+      path.pop_back();
+    }
+  }
+
 private:
+  GraphNodes nodes_;
   GraphNodePtr start_node_;
 };
