@@ -2534,7 +2534,7 @@ Q^*(s,a) = \mathbb{E}[R_{t+1} + \gamma \max_{a'} Q^*(S_{t+1}, a')]
 然后，只要把"理想关系"改写成"逐步逼近的 update"，就得到 Q-Learning：
 
 ```math
-Q(s,a) \leftarrow Q(s,a) + lpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
+Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 ```
 
 这就是 Q-Learning 最核心的公式。
@@ -2546,7 +2546,7 @@ Q(s,a) \leftarrow Q(s,a) + lpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 我们把它拆开来看：
 
 ```math
-Q(s,a) \leftarrow Q(s,a) + lpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
+Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 ```
 
 #### 第 1 部分：`Q(s,a)`
@@ -2862,7 +2862,7 @@ q_table[state][action] = old_q + ALPHA * (target - old_q)
 这和公式是一一对应的：
 
 ```math
-Q(s,a) \leftarrow Q(s,a) + lpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
+Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 ```
 
 ---
@@ -2939,7 +2939,7 @@ epsilon = max(EPSILON_END, epsilon * EPSILON_DECAY)
 #### 必背公式
 
 ```math
-Q(s,a) \leftarrow Q(s,a) + lpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
+Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 ```
 
 速记翻译：
@@ -2972,16 +2972,1057 @@ Q(s,a) \leftarrow Q(s,a) + lpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 
 ---
 
+## 第五章：Deep Q-Network (DQN) - 用神经网络替代 Q 表
+
+### 序：为什么 Q-Learning 还不够？
+
+第四章里，Q-Learning 已经解决了一个关键问题：
+
+> **Agent 不需要人手写规则，可以靠试错把 `Q(s,a)` 学出来。**
+
+但它默认了一件很奢侈的事：
+
+> **你能把所有状态都列出来，并给每个状态-动作对留一个表格位置。**
+
+在迷宫里，这还行。
+在 `CartPole`、自动驾驶、机器人控制里，这就开始崩了。
+
+因为这类任务里的状态往往是连续、高维、巨量的：
+- 小车位置是实数
+- 速度是实数
+- 杆子角度是实数
+- 角速度还是实数
+
+如果你还想像 Q-table 那样：
+
+```text
+Q(状态1, 左)
+Q(状态1, 右)
+Q(状态2, 左)
+Q(状态2, 右)
+...
+```
+
+那表会直接爆炸。
+
+所以第五章要解决的问题是：
+
+> **当状态空间大到放不下一张 Q 表时，怎么继续学 `Q(s,a)`？**
+
+---
+
+### 1. Problem：Q 表为什么会爆炸？
+
+先从最根本的问题出发。
+
+Q-Learning 的更新公式没有问题：
+
+```math
+Q(s,a) \leftarrow Q(s,a) + lpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
+```
+
+问题不在公式，而在 **存储方式**。
+
+Q-table 的前提是：
+- 状态空间是有限的
+- 每个状态都能被枚举
+- 每个状态都能被唯一索引
+
+但真实任务不是这样。
+
+以 `CartPole` 为例，状态通常是：
+
+```text
+s = [cart_position, cart_velocity, pole_angle, pole_angular_velocity]
+```
+
+这 4 个量都是连续值。
+
+这意味着：
+- 不存在一个天然有限的小表可以全部装下
+- 即使强行离散化，也会丢掉精度
+- 稍微复杂一点的任务，表大小就会指数爆炸
+
+所以本质问题是：
+
+> **Q-Learning 缺的不是更新规则，而是可扩展的函数表示。**
+
+---
+
+### 2. Limitation：为什么离散化不是根本解法？
+
+一个最自然的补丁是：
+
+> 那我把连续状态硬切成格子，不就又能用表了吗？
+
+比如：
+- 角度按 100 个区间切
+- 速度按 100 个区间切
+- 位置按 100 个区间切
+- 角速度按 100 个区间切
+
+那状态总数就是：
+
+```text
+100^4 = 100,000,000
+```
+
+这还只是 4 维。
+
+如果换成图像输入，状态是 `84 x 84 x 4` 像素堆叠：
+
+```text
+状态维度 = 28224
+```
+
+这时 Q-table 已经不是大一点的问题，而是根本没法用。
+
+更致命的是，Q-table 没有泛化能力：
+- 学过状态 A，不代表会状态 B
+- 即使 A 和 B 很像，也得分开学
+
+这暴露出更深的缺陷：
+
+> **Q-table 只会记忆，不会抽象。**
+
+---
+
+### 3. New Idea：用函数逼近代替查表
+
+既然表装不下，那就别存表了。
+
+新的想法是：
+
+> **不要为每个状态单独存一个 Q 值，而是训练一个函数，输入状态，输出各动作的 Q 值。**
+
+写成形式就是：
+
+```math
+Q(s,a) pprox Q(s,a; 	heta)
+```
+
+其中：
+- `	heta` 是神经网络参数
+- 输入是状态 `s`
+- 输出是每个动作的价值估计
+
+如果动作是离散的，比如 `CartPole` 只有左/右两个动作：
+
+```text
+输入:  s = [x, x_dot, theta, theta_dot]
+输出: [Q(s, left), Q(s, right)]
+```
+
+于是：
+- 不需要维护巨大表格
+- 相似状态可以共享参数
+- 学到的规律可以泛化到没见过的新状态
+
+这就是 DQN 的第一步突破：
+
+> **把 Q 从“记忆表”升级成“可泛化函数”。**
+
+---
+
+### 4. Mechanism：DQN 到底怎么工作？
+
+#### 4.1 核心结构
+
+DQN 仍然在学 Q，只是把表换成网络：
+
+```text
+状态 s
+  |
+  v
+Neural Network Q(s; theta)
+  |
+  +--> Q(s, left)
+  +--> Q(s, right)
+```
+
+然后动作选择还是和以前一样：
+
+```math
+a = rg\max_a Q(s,a; 	heta)
+```
+
+也就是说：
+- **决策逻辑没变**：还是选 Q 最大的动作
+- **Bellman target 没变**：还是 `r + gamma max Q(s',a')`
+- **变化的只是 Q 的表示方式**
+
+---
+
+#### 4.2 训练目标
+
+DQN 的训练本质是：
+
+> **让网络输出的 Q 值，逼近 Bellman target。**
+
+目标写成：
+
+```math
+y = r + \gamma \max_{a'} Q(s',a'; 	heta^-)
+```
+
+损失函数：
+
+```math
+L(	heta) = (y - Q(s,a; 	heta))^2
+```
+
+这就是一个监督学习味很重的过程：
+- 输入：状态 `s`
+- 预测：`Q(s,a; 	heta)`
+- 标签：Bellman target `y`
+- 优化：最小化 MSE
+
+但要注意：
+
+> **这个标签不是外部真值，而是 RL 自己构造出来的 bootstrap target。**
+
+这就是 DQN 的特别之处。
+
+---
+
+#### 4.3 为什么要有 Replay Buffer？
+
+如果你每一步交互完就立刻拿当前样本训练，会有两个问题：
+
+1. 相邻样本太像，训练数据强相关
+2. 网络刚更新，target 又跟着变，系统容易抖
+
+所以 DQN 引入了 **经验回放（Experience Replay）**：
+
+```text
+(s, a, r, s', done)
+```
+
+都先丢进一个 buffer 里。
+
+训练时从里面随机采样 batch：
+
+```python
+batch = random.sample(replay_buffer, batch_size)
+```
+
+效果：
+- 打散样本相关性
+- 提高样本利用率
+- 让训练更像稳定的 i.i.d. 学习
+
+---
+
+#### 4.4 为什么要有 Target Network？
+
+如果你直接用同一个网络同时算：
+- 当前 Q
+- 下一状态 target
+
+那就会出现：
+
+> **你一边改答案，一边又拿改动中的答案当老师。**
+
+这很容易发散。
+
+所以 DQN 会维护两套网络：
+
+- `online network`: 当前正在训练的网络 `Q(s,a; 	heta)`
+- `target network`: 延迟更新的目标网络 `Q(s,a; 	heta^-)`
+
+更新流程：
+
+```python
+if step % target_update == 0:
+    target_net.load_state_dict(online_net.state_dict())
+```
+
+直觉上：
+- online net 负责学
+- target net 负责暂时当“较稳定的老师”
+
+所以 DQN 的稳定性，靠的是两个补丁：
+- replay buffer
+- target network
+
+---
+
+### 5. 示例：用 DQN 学 CartPole
+
+#### 5.1 任务是什么？
+
+`CartPole` 的目标是：
+
+> **控制小车左右移动，让杆子尽量不要倒。**
+
+状态：
+
+```text
+[x, x_dot, theta, theta_dot]
+```
+
+动作：
+- `0`: left
+- `1`: right
+
+奖励：
+- 每坚持 1 步，奖励 `+1`
+
+为什么这个任务适合 DQN？
+因为：
+- 动作是离散的（左/右）
+- 状态是连续的（Q-table 不适合）
+- 刚好体现“表不够用，网络接管”的过渡
+
+---
+
+#### 5.2 训练逻辑
+
+```python
+for episode in range(num_episodes):
+    state = env.reset()
+
+    while not done:
+        if random.random() < epsilon:
+            action = env.action_space.sample()
+        else:
+            q_values = online_net(state)
+            action = argmax(q_values)
+
+        next_state, reward, done = env.step(action)
+        replay_buffer.add(state, action, reward, next_state, done)
+        state = next_state
+
+        if len(replay_buffer) > batch_size:
+            batch = replay_buffer.sample(batch_size)
+            train_dqn(batch)
+```
+
+`train_dqn(batch)` 核心：
+
+```python
+y = r + gamma * max(target_net(next_state))
+loss = mse(online_net(state)[action], y)
+backward(loss)
+```
+
+随着训练推进：
+- 网络逐渐学会什么姿态下该往左，什么姿态下该往右
+- 平均坚持步数会从十几步涨到几百步
+
+---
+
+### 6. Role：DQN 在 RL 发展史里的角色
+
+DQN 的地位非常关键，因为它完成了一个历史级跨越：
+
+> **把 value-based RL 从“小表格玩具”，推进到了“高维感知任务”。**
+
+它让大家第一次真正看到：
+- RL 可以吃连续状态
+- 神经网络可以学控制策略
+- Atari 这种像素级输入也能直接做决策
+
+一句话概括：
+
+> **Q-Learning 解决“怎么学动作价值”，DQN 解决“在大状态空间里怎么表示动作价值”。**
+
+---
+
+### 7. Effect：DQN 带来了什么改变？
+
+1. **从记忆走向泛化**
+   - Q-table: 见过才会
+   - DQN: 没见过但相似，也能猜个八九不离十
+
+2. **从小状态空间走向高维输入**
+   - 可以处理连续状态
+   - 可以接图像、传感器、向量特征
+
+3. **把深度学习正式接入 RL**
+   - 这条线后来长出了 Double DQN、Dueling DQN、Rainbow 等一堆变体
+
+但也要看到它的边界：
+- 主要适合离散动作空间
+- 训练仍可能不稳定
+- 样本效率并不算特别高
+
+所以接下来就会自然出现一个新方向：
+
+> **既然我最终想要的是策略，能不能别绕道学 Q，直接优化策略本身？**
+
+这就来到第六章：Policy Gradient。
+
+---
+
+### 第五章速记版
+
+#### 一句话主线
+
+- Q-Learning 的思想没问题，问题是 Q-table 装不下大状态空间
+- DQN 用神经网络 `Q(s,a; 	heta)` 代替 Q-table
+- 训练目标仍然来自 Bellman target
+- 为了稳定训练，需要 replay buffer 和 target network
+
+#### 必背公式
+
+```math
+y = r + \gamma \max_{a'} Q(s',a'; 	heta^-)
+```
+
+```math
+L(	heta) = (y - Q(s,a; 	heta))^2
+```
+
+#### 必背术语
+
+- `Function Approximation`：函数逼近
+- `Replay Buffer`：经验回放池
+- `Target Network`：目标网络
+- `Online Network`：在线训练网络
+
+#### 最短背诵版
+
+1. Q-table 不可扩展
+2. DQN 用网络输出 Q 值
+3. Bellman target 仍然是老师
+4. Replay Buffer 打散样本相关性
+5. Target Network 防止训练目标乱飘
+
+---
+
+## 第六章：Policy Gradient - 直接优化策略
+
+### 序：为什么不直接学“怎么选动作”？
+
+前面几章的主线一直是：
+
+- 先定义 value / Q
+- 再通过 Bellman 学 value / Q
+- 最后从 Q 里导出策略
+
+但这条路线本质上是：
+
+> **绕路。**
+
+我真正想要的是：
+
+> **给定状态时，直接知道该怎么行动。**
+
+如果终极目标是策略 `pi(a|s)`，那我就会自然追问：
+
+> **为什么不直接优化策略本身？**
+
+这就是 Policy Gradient 的出发点。
+
+---
+
+### 1. Problem：Value-based 方法绕了一层
+
+Q-Learning / DQN 的工作流是：
+
+```text
+先学 Q(s,a)
+   |
+   v
+再选 argmax_a Q(s,a)
+```
+
+这当然可行，但它有几个天然限制：
+
+1. **动作是离散的才好做 argmax**
+   - 左/右、上/下很好处理
+   - 但机器人扭矩、方向盘角度、油门大小是连续动作
+
+2. **策略是隐式长出来的，不是直接学出来的**
+   - 你学的是 Q
+   - 策略只是“顺手从 Q 里挑最大”
+
+3. **有时我们更关心动作分布本身**
+   - 想保留随机探索
+   - 想输出高斯分布参数
+   - 想显式控制策略熵
+
+所以问题变成：
+
+> **如果策略才是最终目标，那能不能直接把策略写成一个可优化对象？**
+
+---
+
+### 2. New Idea：把策略参数化，直接优化期望回报
+
+这时最自然的新 idea 是：
+
+> **把策略也写成一个带参数的函数。**
+
+即：
+
+```math
+\pi_\theta(a|s)
+```
+
+其中：
+- `theta` 是策略网络参数
+- 输入状态 `s`
+- 输出动作概率分布
+
+如果动作空间离散：
+
+```text
+\pi_\theta(a|s) = [0.1, 0.7, 0.2]
+```
+
+表示：
+- 动作 1 概率 10%
+- 动作 2 概率 70%
+- 动作 3 概率 20%
+
+于是目标就变成：
+
+> **调参数 `theta`，让策略带来的期望总回报最大。**
+
+写成目标函数：
+
+```math
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]
+```
+
+这里 `tau` 是一条轨迹，`R(\tau)` 是整条轨迹总回报。
+
+这一步的本质变化非常大：
+
+- 以前：学 value，策略是附带产物
+- 现在：**策略本身就是被优化的对象**
+
+---
+
+### 3. Mechanism：Policy Gradient 为什么能成立？
+
+核心思想很朴素：
+
+> **如果某次动作带来了高回报，就增加以后再选它的概率；如果带来了低回报，就降低概率。**
+
+这就是策略梯度的方向感。
+
+数学上，经典结果写成：
+
+```math
+\nabla_\theta J(\theta) = \mathbb{E}[G_t \nabla_\theta \log \pi_\theta(a_t|s_t)]
+```
+
+先别被公式吓住，拆开看：
+
+- `log \pi_\theta(a_t|s_t)`：这次动作被策略选中的“倾向度”
+- `\nabla_\theta`：我该朝哪个方向改参数
+- `G_t`：这次动作之后的累计回报
+
+如果 `G_t` 很大：
+- 说明这次动作后果不错
+- 梯度会推动策略增加这个动作的概率
+
+如果 `G_t` 很小甚至很差：
+- 说明这次动作不太行
+- 梯度会推动策略降低这个动作的概率
+
+一句话：
+
+> **Policy Gradient 在做的事，就是“奖优罚劣地重塑动作概率分布”。**
+
+---
+
+### 4. 示例：走悬崖的小机器人
+
+想象一个很窄的桥：
+
+```text
+起点 ---- 桥 ---- 终点
+          |
+          +-- 掉下去 = -100
+```
+
+机器人每一步都要决定：
+- 往前走多少
+- 偏左一点还是偏右一点
+
+这里动作不是“左/右”这种离散标签，而是连续控制量。
+
+如果你用 Q-table：
+- 动作空间太细，根本列不完
+
+如果用 Policy Gradient：
+- 直接输出一个动作分布
+- 比如高斯分布 `N(mu, sigma)`
+- 从中采样具体动作
+
+策略网络可能输出：
+
+```text
+mu = 0.02   # 平均偏右一点点
+sigma = 0.10
+```
+
+如果多次采样后发现：
+- 偏右一点更容易走到终点
+- 偏左容易掉下去
+
+那么更新后策略会逐渐变成：
+- `mu` 更偏安全方向
+- `sigma` 更小，动作更稳
+
+这就是“直接塑造行为分布”。
+
+---
+
+### 5. REINFORCE：最基础的 Policy Gradient 算法
+
+最经典的基础版叫 `REINFORCE`。
+
+流程非常直接：
+
+1. 用当前策略跑一整条 episode
+2. 记录每一步 `(s_t, a_t, G_t)`
+3. 用回报 `G_t` 去加权 log-prob 梯度
+4. 更新参数
+
+伪代码：
+
+```python
+for episode in range(num_episodes):
+    trajectory = []
+    state = env.reset()
+
+    while not done:
+        action = sample_from(policy_net(state))
+        next_state, reward, done = env.step(action)
+        trajectory.append((state, action, reward))
+        state = next_state
+
+    returns = compute_discounted_returns(trajectory)
+
+    loss = 0
+    for (state, action, _), G in zip(trajectory, returns):
+        log_prob = policy_net.log_prob(state, action)
+        loss += -log_prob * G
+
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+```
+
+它的优点很纯粹：
+- 思路直接
+- 推导漂亮
+- 非常适合理解“直接优化策略”这件事
+
+但它也有明显问题：
+- 方差大
+- 收敛慢
+- 一条轨迹好坏波动很大
+
+这会逼出下一章的 `Critic`。
+
+---
+
+### 6. Role：Policy Gradient 在 RL 里的角色
+
+Policy Gradient 的历史作用是：
+
+> **把 RL 的目标从“间接选动作”推进到“直接塑造行为”。**
+
+它最重要的贡献不是单个算法本身，而是打开了一整条新路线：
+
+- REINFORCE
+- TRPO
+- PPO
+- A2C / A3C
+- SAC（某种意义上也带 policy optimization 味道）
+
+尤其在连续动作控制里，Policy Gradient 基本是根线路线。
+
+---
+
+### 7. Effect：直接优化策略带来什么变化？
+
+1. **天然适合连续动作空间**
+   - 不需要对连续动作做 `argmax`
+
+2. **策略可以显式随机化**
+   - 训练时保留探索性
+   - 可以直接输出分布参数
+
+3. **目标更贴近最终任务**
+   - 我想优化的是策略，就直接优化策略
+
+但代价是：
+- 梯度噪声大
+- 学习不稳定
+- 需要更多样本
+
+所以很自然会问：
+
+> **能不能保留“直接学策略”的优点，同时再加一个 value 估计器来降低方差？**
+
+这就来到第七章：Actor-Critic。
+
+---
+
+### 第六章速记版
+
+#### 一句话主线
+
+- Q-Learning / DQN 是先学价值再导出策略
+- Policy Gradient 直接把策略写成 `\pi_\theta(a|s)` 来优化
+- 高回报动作增大概率，低回报动作减小概率
+- 它适合连续动作，但训练方差大
+
+#### 必背公式
+
+```math
+J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]
+```
+
+```math
+
+abla_	heta J(\theta) = \mathbb{E}[G_t 
+abla_	heta \log \pi_\theta(a_t|s_t)]
+```
+
+#### 必背术语
+
+- `Policy Parameterization`
+- `Log-Probability`
+- `Return G_t`
+- `REINFORCE`
+
+#### 最短背诵版
+
+1. 策略才是最终目标
+2. 直接把策略参数化
+3. 高回报动作提高概率
+4. 低回报动作降低概率
+5. 优点是直接、适合连续动作；缺点是高方差
+
+---
+
+## 第七章：Actor-Critic - 结合 Policy 和 Value
+
+### 序：为什么要把 Policy 和 Value 合体？
+
+现在我们已经走过两条路：
+
+- **Value-based 路线**：Q-Learning / DQN
+  - 稳一点
+  - 利用 Bellman bootstrap
+  - 但更像间接学策略
+
+- **Policy-based 路线**：Policy Gradient
+  - 直接优化策略
+  - 适合连续动作
+  - 但方差大，训练容易飘
+
+这时一个极其自然的想法出现了：
+
+> **为什么不让一个模块负责行动，另一个模块负责评价？**
+
+也就是：
+- 一个网络专门决定“做什么”
+- 另一个网络专门判断“做得怎么样”
+
+这就是 Actor-Critic。
+
+---
+
+### 1. Problem：Policy Gradient 为什么高方差？
+
+在 REINFORCE 里，更新方向大致是：
+
+```math
+G_t \nabla_\theta \log \pi_\theta(a_t|s_t)
+```
+
+问题在于：
+- `G_t` 波动很大
+- 同一个状态下，某次成功可能只是运气
+- 某次失败也可能只是后面几步没走好
+
+所以如果你直接拿整条轨迹回报来更新：
+
+> **每一步动作都要背整条 episode 的锅。**
+
+这就会让训练很吵。
+
+我们需要一个更局部、更稳定的评价器，来回答：
+
+> **这一步动作到底比平均水平好多少？**
+
+---
+
+### 2. New Idea：让 Critic 学 Value，让 Actor 学 Policy
+
+Actor-Critic 的核心分工：
+
+#### Actor
+负责输出策略：
+
+```math
+\pi_\theta(a|s)
+```
+
+它回答：
+
+> 在状态 `s` 下，我该怎么行动？
+
+#### Critic
+负责评估状态或动作价值：
+
+```math
+V_w(s) \quad 或 \quad Q_w(s,a)
+```
+
+它回答：
+
+> 这个状态值多少？这一步做得比平均更好吗？
+
+于是形成闭环：
+- Actor 负责做动作
+- Critic 负责打分
+- 打分结果反过来指导 Actor 更新
+
+这就像：
+
+```text
+Actor  = 球员
+Critic = 教练
+```
+
+球员负责上场踢球，教练负责复盘：
+- 这个动作好不好
+- 哪一步值得强化
+- 哪一步该少做一点
+
+---
+
+### 3. Mechanism：Advantage 是怎么出现的？
+
+如果 Critic 只给一个 `V(s)`，那它表示：
+
+> 这个状态平均来说值多少。
+
+但 Actor 真正想知道的是：
+
+> **我刚才这个动作，到底比“平均操作”好多少？**
+
+于是最自然会出现一个差值：
+
+```math
+A(s,a) = Q(s,a) - V(s)
+```
+
+这叫 **Advantage（优势函数）**。
+
+含义非常直白：
+- `A > 0`：这个动作比平均水平好，应该更常做
+- `A < 0`：这个动作比平均水平差，应该少做
+
+在很多 Actor-Critic 算法里，不直接精确求 `Q`，而是用 TD 形式近似优势：
+
+```math
+\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)
+```
+
+这个 `delta_t` 其实就是：
+- 新证据给出的 target
+- 减去旧的状态估计
+
+所以它既是：
+- Critic 的 TD error
+- 也是 Actor 更新时一个很好的 advantage 近似
+
+---
+
+### 4. Actor 和 Critic 怎么一起训练？
+
+#### 4.1 Critic 更新
+
+Critic 的目标是让 value 更准：
+
+```math
+L_{critic} = (r + \gamma V(s') - V(s))^2
+```
+
+它本质是在做 Bellman 回归。
+
+#### 4.2 Actor 更新
+
+Actor 的目标是让高优势动作更可能再次发生：
+
+```math
+\nabla_\theta J(\theta) \approx \mathbb{E}[A_t \nabla_\theta \log \pi_\theta(a_t|s_t)]
+```
+
+如果 `A_t > 0`：
+- 增大该动作概率
+
+如果 `A_t < 0`：
+- 减小该动作概率
+
+你会发现，这和第六章非常像，只不过：
+
+> **原来用的是 noisy 的 `G_t`，现在换成了更局部、更稳定的 `A_t`。**
+
+这就是 Actor-Critic 的力量来源。
+
+---
+
+### 5. 示例：让双足机器人学走路
+
+这个例子很适合 Actor-Critic。
+
+#### 5.1 问题特征
+
+状态：
+- 身体姿态
+- 各关节角度
+- 各关节速度
+- 足底接触信息
+
+动作：
+- 每个关节的连续扭矩输出
+
+奖励：
+- 往前走给正奖励
+- 摔倒给大负奖励
+- 动作太抖也扣分
+
+这里如果用 DQN：
+- 动作空间连续，离散化很别扭
+
+如果用纯 Policy Gradient：
+- 可以直接输出连续动作分布
+- 但训练会非常飘，尤其 early stage 几乎全摔
+
+Actor-Critic 更合理：
+- **Actor** 输出各关节扭矩分布
+- **Critic** 估计当前姿态值不值钱
+- 每走一步，Critic 立刻告诉 Actor：
+  - 刚才那个发力模式比平均好还是差
+
+于是学习信号变成细粒度的：
+- 不是“整局最后摔了，所以全盘否定”
+- 而是“刚刚那一步其实挺稳，值得保留”
+
+这会大幅提升学习效率。
+
+---
+
+### 6. 常见 Actor-Critic 家族
+
+有了这个基本框架，后面会长出很多具体算法：
+
+- `A2C / A3C`：同步 / 异步 Advantage Actor-Critic
+- `PPO`：在 Actor-Critic 基础上加 clip 限制更新幅度
+- `DDPG`：连续动作的 deterministic Actor-Critic
+- `TD3`：DDPG 的稳定增强版
+- `SAC`：带熵正则的 stochastic Actor-Critic
+
+所以 Actor-Critic 不是一个单点算法，而是一整个家族框架。
+
+---
+
+### 7. Role：Actor-Critic 在整条学习路径中的位置
+
+从学习路径看，它像一个“合流点”：
+
+```text
+Value-based 经验  +  Policy-based 直接性
+          \          /
+           \        /
+            Actor-Critic
+```
+
+它继承了：
+- Value 路线的 bootstrapping 和低方差优势
+- Policy 路线的直接优化策略能力
+
+因此它成为现代 RL 的核心骨架之一。
+
+很多工业级、研究级算法，本质都可以看成：
+
+> **在 Actor-Critic 框架上做不同的稳定化和效率增强。**
+
+---
+
+### 8. Effect：Actor-Critic 真正解决了什么？
+
+1. **降低 Policy Gradient 的方差**
+   - 不再只靠整条轨迹回报说话
+
+2. **保留直接优化策略的能力**
+   - 连续动作仍然友好
+
+3. **把 Bellman 思想重新接回策略优化**
+   - Critic 用 TD / Value 学评估
+   - Actor 用 Advantage 学行为
+
+一句话：
+
+> **Actor-Critic = 让“会行动”和“会评价”协同工作。**
+
+---
+
+### 第七章速记版
+
+#### 一句话主线
+
+- 纯 Policy Gradient 方差大
+- 加一个 Critic 学 value，给 Actor 更稳定的更新信号
+- Actor 管行动，Critic 管评价
+- Advantage / TD error 是二者之间的信息桥梁
+
+#### 必背公式
+
+```math
+A(s,a) = Q(s,a) - V(s)
+```
+
+```math
+\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)
+```
+
+```math
+
+abla_	heta J(\theta) pprox \mathbb{E}[A_t 
+abla_	heta \log \pi_\theta(a_t|s_t)]
+```
+
+#### 必背术语
+
+- `Actor`
+- `Critic`
+- `Advantage`
+- `TD Error`
+- `Bootstrapping`
+
+#### 最短背诵版
+
+1. Actor 负责选动作
+2. Critic 负责评估好坏
+3. Advantage 衡量“比平均好多少”
+4. TD error 常被拿来近似 advantage
+5. 现代很多 RL 算法都建立在 Actor-Critic 上
+
+---
+
 ## 路线图
 
 ```
 ✅ 第一章：RL 是什么（Agent / Environment / State / Action / Reward）
 ✅ 第二章：Policy π（确定性 vs 随机性）
 ✅ 第三章：Value Function V(s) 和 Q(s,a)，Bellman 方程
-⬜ 第四章：Q-Learning - 自动学出 Q 表的算法
-⬜ 第五章：Deep Q-Network (DQN) - 用神经网络替代 Q 表
-⬜ 第六章：Policy Gradient - 直接优化策略
-⬜ 第七章：Actor-Critic - 结合 Policy 和 Value
+✅ 第四章：Q-Learning - 自动学出 Q 表的算法
+✅ 第五章：Deep Q-Network (DQN) - 用神经网络替代 Q 表
+✅ 第六章：Policy Gradient - 直接优化策略
+✅ 第七章：Actor-Critic - 结合 Policy 和 Value
 ```
 
 ---

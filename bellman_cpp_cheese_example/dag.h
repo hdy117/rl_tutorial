@@ -154,7 +154,7 @@ public:
 
     // find all path node_a and node_b in the DAG
     Path path;
-    FindPath(start_node_, node_a, node_b, path_list, path);
+    FindPath(node_a, node_b, path_list, path);
 
     return path_list;
   }
@@ -167,42 +167,51 @@ public:
     }
   }
 
-  void FindPath(const GraphNodePtr &node, const GraphNodePtr &node_a,
-                const GraphNodePtr &node_b, PathList &path_list, Path &path) {
+  void FindPath(const GraphNodePtr &node, const GraphNodePtr &node_b,
+                PathList &path_list, Path &path) {
     // stop recursion
     if (node->node_name_ == node_b->node_name_) {
-      if (!path.empty() && path.front()->node_name_ == node_a->node_name_) {
-        // push end node of path
-        path.push_back(node);
 
-        // save this path
-        path_list.push_back(path);
-      } else {
-        LOG_ERROR << "error, path is empty or path's first node is not node_a, "
-                     "invalid path"
-                  << std::endl;
-      }
+      // push end node of path
+      path.push_back(node);
 
-      // return anyway
+      // save this path
+      path_list.push_back(path);
+
+      // return
       return;
     }
 
-    if (node->node_name_ == node_a->node_name_) {
-      // push start node of path
-      path.push_back(node);
-    } else if (!path.empty()) {
-      // push path node
-      path.push_back(node);
-    }
+    // push path node
+    path.push_back(node);
 
     // find recursively
     for (const auto &adj_node : node->neighbors_) {
-      FindPath(adj_node, node_a, node_b, path_list, path);
-      // in case path is empty
-      if (!path.empty()) {
-        path.pop_back();
+      FindPath(adj_node, node_b, path_list, path);
+      // pop path node
+      path.pop_back();
+    }
+  }
+
+  void FindPathAIVersion(const GraphNodePtr &node, const GraphNodePtr &node_b,
+                         PathList &path_list, Path &path) {
+
+    // push end node of path
+    path.push_back(node);
+
+    // stop recursion
+    if (node->node_name_ == node_b->node_name_) {
+      // save this path
+      path_list.push_back(path);
+    } else {
+      // find recursively
+      for (const auto &adj_node : node->neighbors_) {
+        FindPathAIVersion(adj_node, node_b, path_list, path);
       }
     }
+
+    // pop path node
+    path.pop_back();
   }
 
 private:
