@@ -5,7 +5,7 @@ void BuildGraph() {
   auto node_a = std::make_shared<GraphNode>("A", 0.0);
   auto node_b = std::make_shared<GraphNode>("B", 0.0);
   auto node_c = std::make_shared<GraphNode>("C", 0.0);
-  auto node_d = std::make_shared<GraphNode>("D", 0.0);
+  auto node_d = std::make_shared<GraphNode>("D", 1.0, 1.0);
   auto node_e = std::make_shared<GraphNode>("E", 0.0);
 
   LOG_INFO << "build dag.\n";
@@ -33,9 +33,18 @@ void BuildGraph() {
   // find path
   PrintSeperator("Path Finder");
   auto path_list = dag.FindPathFromTo(node_a, node_d);
-  //   for (const auto &path : path_list) {
-  //     dag.PrintPath(path);
-  //   }
+  for (const auto &path : path_list) {
+    dag.PrintPath(path);
+  }
 }
+
+class BellmanUpdate {
+public:
+  BellmanUpdate() {}
+  virtual ~BellmanUpdate() {}
+
+private:
+  DAG values_;
+};
 
 int main() { BuildGraph(); }

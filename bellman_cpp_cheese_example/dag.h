@@ -20,11 +20,12 @@ const int kNodeMaxNeighbors = 50;
 // define a graph node, which has a name, a value, and a list of neighbors
 struct GraphNode {
   std::string node_name_{""};
-  double node_val_{0.0};
+  double reward_{0.0};
+  double value_{0.0};
   std::vector<GraphNodePtr> neighbors_;
 
-  GraphNode(const std::string &node_name, double node_val)
-      : node_name_(node_name), node_val_(node_val) {
+  GraphNode(const std::string &node_name, double node_val, double reward = 0.0)
+      : node_name_(node_name), value_(node_val), reward_(reward) {
     neighbors_.reserve(kNodeMaxNeighbors);
   }
 };
@@ -89,8 +90,8 @@ void VisitNode(const GraphNodePtr &node) {
     LOG_ERROR << "got nullptr of node, visit nothing";
     return;
   }
-  LOG_INFO << "node name:" << node->node_name_
-           << ", node val:" << node->node_val_ << std::endl;
+  LOG_INFO << "node name:" << node->node_name_ << ", value:" << node->value_
+           << ", reward:" << node->reward_ << std::endl;
 }
 
 // print seperator
@@ -162,7 +163,7 @@ public:
   void PrintPath(const Path &path) {
     LOG_INFO << "print path: \n";
     for (const auto &node : path) {
-      LOG_INFO << "\t" << node->node_name_ << ", " << node->node_val_ << "\n";
+      VisitNode(node);
     }
   }
 
@@ -197,7 +198,10 @@ public:
     // find recursively
     for (const auto &adj_node : node->neighbors_) {
       FindPath(adj_node, node_a, node_b, path_list, path);
-      path.pop_back();
+      // in case path is empty
+      if (!path.empty()) {
+        path.pop_back();
+      }
     }
   }
 
