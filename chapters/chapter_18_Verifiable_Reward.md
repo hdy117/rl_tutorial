@@ -1,210 +1,102 @@
-## 第十八章：Verifiable Reward - 为什么 reasoning 训练越来越依赖“可自动检查”的中间与最终信号？
+## 第十八章：Verifiable Reward - 为什么 reasoning 训练越来越依赖"可自动检查"的中间与最终信号？
 
-### 全局导航图
+### 📍 定位
 
-```text
-                    +------------------+
-                    |  延迟奖励 / 长远目标 |
-                    +---------+--------+
-                              |
-                              v
-                     Value / Bellman / TD
-                              |
-                              v
-                    Q-Learning / DQN
+> Outcome Reward → Process Reward → **Verifiable Reward**
 
-                              |
-              +---------------+----------------+
-              |                                |
-              v                                v
-     直接优化策略需求                    连续动作 + 样本效率需求
-              |                                |
-              v                                v
-     Policy Gradient                    DDPG -> TD3 -> SAC
-              |
-              v
-        Actor-Critic
-              |
-              v
-            PPO
-              |
-      +-------+--------+
-      |                |
-      v                v
-  LLM 后训练        经典控制继续
-      |
-      v
- RLHF / PPO for LLMs
-      |
-      v
-     GRPO
-      |
-      v
-Outcome -> Process -> Verifiable Reward
-```
-
-> 你在这里：LLM reasoning reward 分支 -> Verifiable Reward
+本章聚焦：如何把 reward 变成可验证、可自动化、可规模扩展的信号。
 
 ### 序：最理想的 reward，不只是强，还要便宜、稳定、可扩展
 
-到了这里，你会发现 LLM reasoning post-training 正在朝一个非常自然的方向收敛：
+LLM reasoning post-training 正在朝一个方向收敛：
 
 > **尽量把 reward 变成可验证、可自动化、可规模扩展的信号。**
 
-因为无论是：
-- 人类偏好
-- outcome reward
-- process reward
+人类偏好、outcome reward、process reward——都在追求同一个目标：**给模型稳定、可信、可大规模供应的训练反馈**。
 
-最终都在追求一个共同目标：
+核心原则：
 
-> 给模型稳定、可信、可大规模供应的训练反馈
-
-一句话先压住：
-
-> **Verifiable Reward 的本质，是尽量把奖励建立在可自动检查的事实约束上，而不是纯主观印象上。**
+> **Verifiable Reward = 用可自动检查的事实约束代替主观印象**
 
 ---
 
-### 1. Problem：为什么 reasoning 训练会越来越偏向 verifiable reward？
+### 1. Problem：为什么 reasoning 训练越来越偏向 verifiable reward？
 
-#### 1.1 人类标注贵且不稳定
+**人工标注的瓶颈：**
+- 贵、慢、一致性差
 
-纯靠人工偏好：
-- 成本高
-- 吞吐低
-- 一致性有限
+**复杂推理任务的需求：**
+数学、编程、定理证明、工具使用——这些场景需要海量训练数据，人工覆盖不过来。
 
-#### 1.2 复杂推理任务需要高密度、高可信信号
-
-如果任务是：
-- 数学
-- 编程
-- 定理证明
-- 工具使用
-
-那训练量非常大，人工很难覆盖。
-
-#### 1.3 所以 reward 最理想的形态是：可自动判、可重复判、规则明确
-
-这会让训练变得：
+**结论：** reward 必须可自动判、可重复判、规则明确。这样才能：
 - 更稳
-- 更便宜
+- 更便宜  
 - 更可扩展
 
-于是“verifiable”本身变成了 reward 设计里的一个核心标准。
+于是"verifiable"成了 reward 设计的核心标准。
 
 ---
 
-### 2. Starting Point：只要任务能部分形式化，就该尽量把正确性外包给 verifier
+### 2. Starting Point：任务能形式化，就把判分外包给 verifier
 
-从第一性原理看，奖励的职责不是“优雅地描述任务”，而是：
-
-> **稳定地区分更好和更差的行为。**
-
-如果 verifier 能做到这一点，那就应该尽量使用 verifier。
+奖励的职责不是"优雅地描述任务"，而是：**稳定地区分更好和更差的行为**。
 
 verifier 可以作用在：
 - 最终答案
-- 中间步骤
+- 中间步骤  
 - 格式约束
 - 工具调用结果
 - 外部环境反馈
 
-也就是说：
+所以：
 
 ```text
-Verifiable reward 不是单一算法
-而是一种 reward 设计原则
+Verifiable reward = 一种 reward 设计原则，不是单一算法
 ```
 
 ---
 
-### 3. Invention：Verifiable Reward 在实践里通常怎么出现？
+### 3. Invention：Verifiable Reward 在实践里怎么落地？
 
 #### 3.1 最终结果检查
+数学答案比对、单元测试、执行结果比对。
 
-比如：
-- 数学答案比对
-- 单元测试
-- 执行结果比对
-
-#### 3.2 中间过程检查
-
-比如：
-- 子步骤公式是否成立
-- 中间程序状态是否正确
-- 推理链条是否满足局部规则
+#### 3.2 中间过程检查  
+子步骤公式是否成立、中间程序状态是否正确、推理链条是否满足局部规则。
 
 #### 3.3 结构与格式检查
+JSON 是否合法、工具调用参数是否匹配 schema、是否遵守输出协议。
 
-比如：
-- JSON 是否合法
-- 工具调用参数是否匹配 schema
-- 是否遵守输出协议
+#### 3.4 混合奖励（最常见）
+实践里很少单一 reward，通常是：
+- 偏好 reward + outcome reward + process reward + verifier signal
 
-#### 3.4 混合奖励
-
-实践里常常不是单一 reward，而是：
-- 偏好 reward
-- outcome reward
-- process reward
-- verifier signal
-
-一起组合。
-
-这说明 verifiable reward 更像一层底座：
-
-> **凡是能自动判的地方，就尽量别只靠主观打分。**
+这层底座原则很简单：**凡是能自动判的地方，就尽量别只靠主观打分。**
 
 ---
 
-### 4. Verification：为什么这条路对未来 reasoning 训练特别重要？
+### 4. Verification：这条路为什么重要？有边界吗？
 
-#### 4.1 它有没有提高信号稳定性？
+**好处：**
+- 信号更稳（规则检查比人类印象一致）
+- 扩展性更强（verifier 能批量跑，数据规模大很多）
 
-有。
+**边界：**
+不是所有任务都容易验证。开放式写作、审美表达、长篇创意——这些仍需偏好或人工判断。
 
-因为规则明确的检查通常比人类即时印象更一致。
-
-#### 4.2 它有没有提高扩展性？
-
-有。
-
-只要 verifier 能批量运行，数据规模就能大很多。
-
-#### 4.3 它有没有边界？
-
-当然有。
-
-不是所有任务都容易验证：
-- 开放式写作
-- 审美表达
-- 长篇创意任务
-
-这些仍然需要偏好或人工判断。
-
-所以最准确的结论不是“verifiable reward 将替代一切”，而是：
-
-> **在能验证的任务上，verifiable reward 会越来越成为主力；在难验证的任务上，它会和偏好信号并存。**
+结论：在能验证的任务上，verifiable reward 是主力；在难验证的任务上，它和偏好信号并存。
 
 ---
 
-### 5. Example：一个真正现代的 reasoning 训练管线长什么样？
+### 5. Example：现代 reasoning 训练管线的真实形态
 
-例如代码智能体训练：
-- 先看输出格式是否合法
-- 再跑单测看最终行为是否正确
-- 再检查关键中间步骤是否满足约束
-- 必要时叠加偏好模型去评估可读性和帮助性
+代码智能体训练例子：
+- **Layer 1**：输出格式是否合法（JSON/schema）
+- **Layer 2**：跑单测看最终行为是否正确
+- **Layer 3**：检查关键中间步骤是否满足约束  
+- **Layer 4**（可选）：偏好模型评估可读性和帮助性
 
-这时 reward 就不是单一分数，而是一个 layered system：
-- 格式正确性
-- 过程正确性
-- 最终结果正确性
-- 人类偏好
-
-这就是 verifiable reward 思路的现代形态。
+reward 不再是单一分数，而是 layered system：格式正确性 + 过程正确性 + 结果正确性 + 人类偏好。这就是 verifiable reward 思路的现代形态。
 
 ---
 
