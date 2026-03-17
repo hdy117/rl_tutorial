@@ -1,10 +1,3 @@
-# Reinforcement Learning 入门教程
-
-> 视觉学习者友好版 🔥
-> 混合中英文，图多字少
-
----
-
 ## 第一章：RL 是什么？
 
 ### 全局导航图
@@ -50,6 +43,7 @@
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：主干起点 -> RL 基本元素
 
 ### 核心循环
 
@@ -149,6 +143,7 @@ RL 适合**规则难以手写**的场景 - 机器人走路、下棋、打游戏�
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：主干 -> Policy 基础
 
 ### 什么是 Policy？
 
@@ -240,6 +235,7 @@ State ──▶ Policy (π) ──▶ Action
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：主干 -> Value / Bellman
 
 ---
 
@@ -2435,7 +2431,6 @@ Q^*(s,a) = \mathbb{E}[R_{t+1} + \gamma \max_{a'} Q^*(S_{t+1}, a')]
 
 ---
 
-
 ## 第四章：Q-Learning（让 Agent 开始真正学习）
 
 ### 全局导航图
@@ -2481,6 +2476,7 @@ Q^*(s,a) = \mathbb{E}[R_{t+1} + \gamma \max_{a'} Q^*(S_{t+1}, a')]
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：主干 -> Q-Learning
 
 ### 序：从 Bellman 两种方程，到 Q-Learning
 
@@ -3367,6 +3363,7 @@ Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：主干 -> DQN
 
 ### 序：从 Q-Table 到 DQN
 
@@ -3815,6 +3812,7 @@ L(\theta) = (y - Q(s,a; \theta))^2
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：主干 -> Policy Gradient
 
 ### 序：从“先学价值”到“直接学行为”
 
@@ -4280,6 +4278,7 @@ J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：主干 -> Actor-Critic
 
 ### 序：从“直接学策略”到“给策略配一个评价器”
 
@@ -4700,6 +4699,7 @@ A(s,a) = Q(s,a) - V(s)
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：主干 -> PPO
 
 ### 序：从“能学”到“稳稳地学”
 
@@ -5102,6 +5102,7 @@ L^{CLIP}(\theta) = \mathbb{E}\Big[
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：LLM 分支入口 -> 为什么从 PPO 转向 RLHF / GRPO 语境
 
 ### 序：GRPO 不是“经典控制主线的下一站”，而是“PPO 在 LLM 场景下的变体”
 
@@ -5502,6 +5503,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：LLM 分支 -> RLHF 起点
 
 ### 序：预训练教会模型“像互联网说话”，但没教会它“按人类偏好回答”
 
@@ -5955,6 +5957,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：LLM 分支 -> PPO for LLMs
 
 ### 序：PPO 进了语言模型，不是换个名字，而是换了“状态、动作、奖励”的语义
 
@@ -6301,6 +6304,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：LLM 分支 -> GRPO
 
 ### 序：GRPO 不是凭空冒出来的新名字，而是 LLM 场景继续把 PPO 改造下去的结果
 
@@ -6619,6 +6623,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：连续控制分支 -> DDPG
 
 ### 序：PPO 能做连续动作，但为什么工程上还会继续长出 DDPG？
 
@@ -6915,6 +6920,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：连续控制分支 -> TD3
 
 ### 序：DDPG 方向对了，但它太容易“自信过头”
 
@@ -7179,6 +7185,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：连续控制分支 -> SAC
 
 ### 序：如果探索不该只是“外加噪声”，那随机性就该进目标函数本身
 
@@ -7477,6 +7484,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：LLM reasoning reward 分支 -> Outcome Reward
 
 ### 序：当任务可以自动判分时，reward 突然变得更可靠了
 
@@ -7739,6 +7747,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：LLM reasoning reward 分支 -> Process Reward
 
 ### 序：如果过程本身决定了可泛化性，那训练就不能只在终点打分
 
@@ -8000,6 +8009,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：LLM reasoning reward 分支 -> Verifiable Reward
 
 ### 序：最理想的 reward，不只是强，还要便宜、稳定、可扩展
 
@@ -8256,6 +8266,7 @@ Example:
 Outcome -> Process -> Verifiable Reward
 ```
 
+> 你在这里：全书总览 -> 把所有分支重新压成一张因果地图
 
 ### 序：别把 RL 学成算法名单，要把它学成“一个问题不断逼出下一个问题”的系统
 
