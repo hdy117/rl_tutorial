@@ -1,6 +1,7 @@
 
 #include "dag.h"
 
+// not fully correct version
 class BellmanUpdate {
 public:
   BellmanUpdate(double alpha = 0.001, double gamma = 0.9)
