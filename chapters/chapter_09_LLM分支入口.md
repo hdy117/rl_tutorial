@@ -1,83 +1,54 @@
-## 第九章：LLM 分支入口 - 为什么 GRPO 应该放在 PPO 之后？
+## 第九章：LLM 分支入口——为什么 GRPO 应该在 PPO 之后讲？
 
-### 全局导航图
-
-```text
-                    +------------------+
-                    |  延迟奖励 / 长远目标 |
-                    +---------+--------+
-                              |
-                              v
-                     Value / Bellman / TD
-                              |
-                              v
-                    Q-Learning / DQN
-
-                              |
-              +---------------+----------------+
-              |                                |
-              v                                v
-     直接优化策略需求                    连续动作 + 样本效率需求
-              |                                |
-              v                                v
-     Policy Gradient                    DDPG -> TD3 -> SAC
-              |
-              v
-        Actor-Critic
-              |
-              v
-            PPO
-              |
-      +-------+--------+
-      |                |
-      v                v
-  LLM 后训练        经典控制继续
-      |
-      v
- RLHF / PPO for LLMs
-      |
-      v
-     GRPO
-      |
-      v
-Outcome -> Process -> Verifiable Reward
-```
-
-> 你在这里：LLM 分支入口 -> 为什么从 PPO 转向 RLHF / GRPO 语境
-
-### 序：GRPO 不是“经典控制主线的下一站”，而是“PPO 在 LLM 场景下的变体”
-
-先把位置说死，不然后面章节会越写越乱：
-
-> **GRPO 最合适放在 PPO 之后，但不要把它当成 DQN / Actor-Critic 那种通用 RL 主线算法，而要把它放进“LLM post-training / RL for language models”这条分支里。**
-
-原因很简单：
-- `PPO` 解决的是：策略更新别太猛
-- `GRPO` 继承的正是这条思路
-- 但它服务的主要场景，不是经典控制，而是 **LLM 对齐 / reasoning post-training**
-
-所以它在教程里的位置，最自然应该是：
+## 你在这里
 
 ```text
 经典 RL 主线：
 Q-Learning -> DQN -> Policy Gradient -> Actor-Critic -> PPO
-
-然后分叉：
-- 控制 / 连续动作分支：DDPG / TD3 / SAC
-- LLM 分支：RLHF / PPO for LLMs -> GRPO
+                              |
+                    +---------+--------+
+                    v                v
+              LLM 后训练分支    经典控制继续
+                 (本章)      (DDPG/TD3/SAC)
 ```
 
-一句话先压住：
+## 问题：GRPO 该放在哪里讲？
 
-> **GRPO 不该插在 PPO 前面，也不该硬塞进经典机器人控制主线；它最适合放在“PPO 之后，作为 LLM 强化学习特化变体”来讲。**
+如果你现在学完了 PPO，脑子里可能有这几个疑问：
+
+- "接下来是不是该讲 GRPO 了？"
+- "GRPO 和 PPO 是什么关系？"
+- "它像 DQN -> TD3 / SAC 那样是主线的下一步吗？"
+
+先把位置说死：**GRPO 最合适放在 PPO 之后，但它不是经典控制主线的下一站，而是 LLM 后训练分支的特化算法。**
+
+原因很简单：
+- `PPO` 解决的是：策略更新别太猛
+- `GRPO` 继承的正是这条思路
+- 但它的服务场景是 **LLM 对齐 / reasoning post-training**，不是通用控制任务
+
+所以它在教程里的位置应该是：
+
+```text
+Policy Gradient -> Actor-Critic -> PPO
+                              |
+                              v
+                    LLM 分支：RLHF / GRPO
+```
+
+一句话先压住：**GRPO 不该插在 PPO 前面，也不该硬塞进经典机器人控制主线。**
 
 ---
 
-### 1. Problem：为什么不能把 GRPO 和 DQN / PPO 并排当成同一级主线算法？
+## 1. Problem：为什么不能把 GRPO 和 DQN / PPO 并排当成同一级主线算法？
+
+---
+
+#### 1. Problem：为什么不能把 GRPO 和 DQN / PPO 并排当成同一级主线算法？
 
 因为它们解决的问题层级不一样。
 
-#### 1.1 经典 RL 主线关心的是“如何学会行动”
+#### 1.1 经典 RL 主线关心的是"如何学会行动"
 
 前面这些章节主要在解决：
 - 怎么定义 value
@@ -95,7 +66,7 @@ Q-Learning -> DQN -> Policy Gradient -> Actor-Critic -> PPO
 
 都会遇到。
 
-#### 1.2 GRPO 关心的是“LLM 场景下，怎么更便宜地做相对策略优化”
+#### 1.2 GRPO 关心的是"LLM 场景下，怎么更便宜地做相对策略优化"
 
 GRPO 的语境明显更窄：
 - 一个 prompt 往往会采样多条回答
@@ -103,7 +74,7 @@ GRPO 的语境明显更窄：
 - 训练对象是 language model，不是传统 control policy
 - 我们常常更关心生成质量排序、group-relative 信号、以及减少额外 value model 成本
 
-所以从“问题被什么逼出来”这个角度看，GRPO 并不是对前面所有 RL 任务都自然适用的下一站，而是：
+所以从"问题被什么逼出来"这个角度看，GRPO 并不是对前面所有 RL 任务都自然适用的下一站，而是：
 
 > **在 PPO 已经成立之后，LLM 训练场景又提出了新要求，于是长出来的专用分支。**
 
@@ -117,7 +88,7 @@ GRPO 的语境明显更窄：
 
 差别非常大。
 
-#### 2.1 LLM 常常不是“每一步都有环境奖励”
+#### 2.1 LLM 常常不是"每一步都有环境奖励"
 
 在机器人里，你可以有：
 - 每走一步的 reward
@@ -148,7 +119,7 @@ PPO 在很多实现里会搭配 value function / critic：
 
 于是 LLM 场景会自然提出一个新问题：
 
-> **能不能保留 PPO 这种“限制策略别一步改太猛”的优点，同时又更贴合“多答案比较”这种反馈形式，并尽量减少 critic 负担？**
+> **能不能保留 PPO 这种"限制策略别一步改太猛"的优点，同时又更贴合"多答案比较"这种反馈形式，并尽量减少 critic 负担？**
 
 这就是 GRPO 的出发点。
 
@@ -158,9 +129,9 @@ PPO 在很多实现里会搭配 value function / critic：
 
 先说本质，不先堆细节：
 
-> **GRPO 可以看成是：把 PPO 的“保守策略更新”思想，和 LLM 场景里的“组内相对奖励”结合起来。**
+> **GRPO 可以看成是：把 PPO 的"保守策略更新"思想，和 LLM 场景里的"组内相对奖励"结合起来。**
 
-#### 3.1 从“单条样本值多少钱”转向“同组里谁相对更好”
+#### 3.1 从"单条样本值多少钱"转向"同组里谁相对更好"
 
 在 LLM 场景里，一个很自然的训练单元是：
 - 同一个 prompt
@@ -179,7 +150,7 @@ PPO 在很多实现里会搭配 value function / critic：
 在同一个 prompt 的这组回答里，哪条更好？好多少？
 ```
 
-这就天然引出“group-relative”信号。
+这就天然引出"group-relative"信号。
 
 #### 3.2 Advantage 的来源不再主要靠 critic，而更像组内相对基线
 
@@ -193,13 +164,13 @@ PPO / Actor-Critic 里，`Advantage` 常常来自：
 - 比较它们的 reward
 - 用组内均值、相对排名、标准化分数之类的方式形成相对优势信号
 
-也就是说，它把“这条样本比 baseline 好多少”这个问题，更多地交给：
+也就是说，它把"这条样本比 baseline 好多少"这个问题，更多地交给：
 - **组内相对比较**
 
 而不是：
 - 单独训练一个 critic 去估每个 token / 序列的 value
 
-#### 3.3 PPO 的“别走太猛”思想仍然保留
+#### 3.3 PPO 的"别走太猛"思想仍然保留
 
 这点很关键。
 
@@ -223,7 +194,7 @@ GRPO: 保守策略更新 + group-relative advantage
 
 ---
 
-### 4. Verification：为什么说“PPO 之后讲 GRPO”比“把 GRPO 提前”更合理？
+### 4. Verification：为什么说"PPO 之后讲 GRPO"比"把 GRPO 提前"更合理？
 
 #### 4.1 不先讲 PPO，你很难解释 GRPO 到底继承了什么
 
@@ -235,7 +206,7 @@ GRPO: 保守策略更新 + group-relative advantage
 那你一上来讲 GRPO，很容易变成：
 - 记一个名字
 - 背一个实现
-- 知道它“好像是 RLHF / DeepSeek 在用的”
+- 知道它"好像是 RLHF / DeepSeek 在用的"
 
 但不知道它到底是从什么矛盾里长出来的。
 
@@ -245,8 +216,8 @@ GRPO: 保守策略更新 + group-relative advantage
 - 经典控制任务和 LLM 后训练的反馈结构不一样
 
 那 GRPO 就会看起来像：
-- “PPO 的升级版”
-- 或者“下一个更高级的标准算法”
+- "PPO 的升级版"
+- 或者"下一个更高级的标准算法"
 
 这其实会误导。
 
@@ -319,7 +290,7 @@ Policy Gradient
 
 ### 6. 教程结构上，最推荐怎么放？
 
-如果你的教程目标是“先打通通用 RL 主线，再进入 LLM RL”，那我推荐这样排：
+如果你的教程目标是"先打通通用 RL 主线，再进入 LLM RL"，那我推荐这样排：
 
 ```text
 第 1-8 章：经典 RL 主线
