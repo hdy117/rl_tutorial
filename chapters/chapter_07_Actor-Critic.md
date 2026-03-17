@@ -45,7 +45,7 @@ Outcome -> Process -> Verifiable Reward
 
 > 你在这里：主干 -> Actor-Critic
 
-### 序：从“直接学策略”到“给策略配一个评价器”
+### 序：从"直接学策略"到"给策略配一个评价器"
 
 第六章已经把一件事说透了：
 
@@ -63,7 +63,7 @@ problem -> starting point -> invention -> verification -> example
 
 一句话先压住：
 
-> **Actor-Critic 的本质，是让一个模块负责行动，让另一个模块负责评价，从而把“直接学策略”和“稳定给反馈”结合起来。**
+> **Actor-Critic 的本质，是让一个模块负责行动，让另一个模块负责评价，从而把"直接学策略"和"稳定给反馈"结合起来。**
 
 ---
 
@@ -98,19 +98,19 @@ G_t \nabla_\theta \log \pi_\theta(a_t|s_t)
 
 如果直接用整段回报去更新，那么策略就会被这些大波动拉来拉去。
 
-也就是说，Policy Gradient 现在遇到的不是“目标错了”，而是：
+也就是说，Policy Gradient 现在遇到的不是"目标错了"，而是：
 
 > **缺少一个更局部、更稳定的评价信号。**
 
 ---
 
-### 2. Starting Point：Actor 需要的不是总分，而是“这一步比平均好多少”
+### 2. Starting Point：Actor 需要的不是总分，而是"这一步比平均好多少"
 
 如果从第一性原理继续推，我们要先问：
 
 > **一个负责行动的策略模块，真正需要什么样的反馈？**
 
-答案不是“整局最终总分”。
+答案不是"整局最终总分"。
 
 因为对当前动作来说，更有用的问题其实是：
 
@@ -120,7 +120,7 @@ G_t \nabla_\theta \log \pi_\theta(a_t|s_t)
 - 全局、粗糙的 `G_t`
 
 改成了：
-- 局部、相对的“是否优于 baseline”
+- 局部、相对的"是否优于 baseline"
 
 于是自然就会出现模块分工。
 
@@ -146,15 +146,15 @@ V_w(s) \quad 或 \quad Q_w(s,a)
 
 > 当前状态值多少？刚才那个动作相对平均水平怎么样？
 
-所以这一章的出发点不是“我要两个网络”，而是：
+所以这一章的出发点不是"我要两个网络"，而是：
 
-> **我需要把“做动作”和“评估动作”分成两个职能。**
+> **我需要把"做动作"和"评估动作"分成两个职能。**
 
 ---
 
 ### 3. Invention：Actor-Critic 是怎么长出来的？
 
-一旦接受“行动者需要评价者”，下一步自然会问：
+一旦接受"行动者需要评价者"，下一步自然会问：
 
 > **Critic 到底应该给 Actor 什么信息，才最有用？**
 
@@ -172,7 +172,7 @@ V(s)
 但 Actor 真正关心的是：
 - 我刚才选的这个动作，相对于这个状态下的平均动作，到底更好还是更差？
 
-所以只知道“状态总体值”还不够，必须有一个“相对超额收益”的量。
+所以只知道"状态总体值"还不够，必须有一个"相对超额收益"的量。
 
 #### 3.2 Advantage 被逼出来了
 
@@ -217,38 +217,35 @@ A(s,a) = Q(s,a) - V(s)
 
 于是 `\delta_t` 同时扮演两个角色：
 - 对 Critic 来说，它是 TD error
-- 对 Actor 来说，它可以近似“这一步比平均好多少”
+- 对 Actor 来说，它可以近似"这一步比平均好多少"
 
 这就是 Actor-Critic 最漂亮的地方：
 
 > **Bellman 的局部递推，被重新接回了策略优化。**
 
-#### 3.4 最终形成两个更新闭环
+#### 3.4 两个模块开始互相配合
 
-Critic 更新自己的 value 估计：
+Critic 更新 value，让它更接近真实状态值：
 
 ```math
 L_{critic} = (r + \gamma V(s') - V(s))^2
 ```
 
-Actor 用 advantage 风格的信号更新策略：
+Actor 用 advantage 信号调整策略：
 
 ```math
 \nabla_\theta J(\theta) \approx \mathbb{E}[A_t \nabla_\theta \log \pi_\theta(a_t|s_t)]
 ```
 
-你可以把它理解成：
+核心直觉就一句：
 
-```text
-Critic 负责把“这一步表现怎样”翻译成更稳定的学习信号
-Actor 负责根据这个信号去调整行为分布
-```
+> Critic 把"这一步表现怎样"翻译成稳定信号，Actor 根据这个信号调整行为。
 
 ---
 
 ### 4. Verification：怎么确认 Actor-Critic 真解决了前一章的问题？
 
-#### 4.1 它有没有保留“直接学策略”的优点？
+#### 4.1 它有没有保留"直接学策略"的优点？
 
 有。
 
@@ -275,7 +272,7 @@ Actor 仍然在直接优化：
 
 所以反馈变得更短、更局部，方差通常明显下降。
 
-#### 4.3 它还能不能区分“比平均好”还是“比平均差”？
+#### 4.3 它还能不能区分"比平均好"还是"比平均差"？
 
 能。
 
@@ -283,7 +280,7 @@ Actor 仍然在直接优化：
 - 正值 -> 强化这个动作
 - 负值 -> 削弱这个动作
 
-所以 Actor 不再是被“整局总分”粗暴驱动，而是在接受更细粒度的相对反馈。
+所以 Actor 不再是被"整局总分"粗暴驱动，而是在接受更细粒度的相对反馈。
 
 #### 4.4 它有没有新的代价？
 
@@ -357,65 +354,35 @@ Actor 仍然在直接优化：
 
 ---
 
-### 6. 这一章最后压成一张脑图
+### 6. 本章速记卡片
 
-```text
-Problem:
-pure Policy Gradient 用整条回报更新，方差大，credit assignment 粗糙
+#### 核心直觉
 
-Starting Point:
-Actor 需要的不是整局总分，而是“这一步比平均好多少”
+Policy Gradient 方向是对的，但信号太吵。加一个 Critic 给 Actor 更稳定的反馈，关键桥梁是 `Advantage`。
 
-Invention:
-拆成 Actor + Critic
-用 Advantage / TD error 作为桥梁信号
-
-Verification:
-保留直接优化策略的优点，同时让反馈更局部、更稳定
-代价是系统更复杂，两个模块会相互影响
-
-Example:
-双足机器人学走路时，Critic 能告诉 Actor 哪一步发力模式值得保留
-```
-
-### 本章速记卡片
-
-#### 一句话主线
-
-- Policy Gradient 的方向是对的，但更新太吵
-- 所以加一个 Critic，专门负责给 Actor 更稳定的反馈
-- 关键桥梁是 `Advantage` 或它的一步近似 `TD error`
-- 这让“直接学策略”与“局部稳定反馈”结合起来
-
-#### 必背公式
+#### 三个公式就够了
 
 ```math
-A(s,a) = Q(s,a) - V(s)
+A(s,a) = Q(s,a) - V(s) \quad \text{（比平均好多少）}
 ```
 
 ```math
-\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)
+\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t) \quad \text{（TD error 近似 advantage）}
 ```
 
 ```math
-\nabla_\theta J(\theta) \approx \mathbb{E}[A_t \nabla_\theta \log \pi_\theta(a_t|s_t)]
+\nabla_\theta J(\theta) \approx \mathbb{E}[A_t \nabla_\theta \log \pi_\theta(a_t|s_t)] \quad \text{（策略更新方向）}
 ```
 
-#### 必背术语
+#### 五句话记住本章
 
-- `Actor`
-- `Critic`
-- `Advantage`
-- `TD Error`
-- `Bootstrapping`
+1. Actor 负责行动，Critic 负责评价  
+2. Advantage = "这一步比平均好多少"  
+3. TD error 是 advantage 的便宜近似  
+4. 信号更局部了，方差更小  
+5. 代价是两个模块会互相影响  
 
-#### 最短背诵版
-
-1. Actor 负责行动
-2. Critic 负责评价
-3. Advantage 表示“这一步比平均好多少”
-4. TD error 常被拿来近似这个优势
-5. 现代很多 RL 算法都建立在 Actor-Critic 框架上
+---
 
 ---
 
