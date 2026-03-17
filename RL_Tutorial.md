@@ -5123,7 +5123,7 @@ Q-Learning -> DQN -> Policy Gradient -> Actor-Critic -> PPO
 
 然后分叉：
 - 控制 / 连续动作分支：DDPG / TD3 / SAC
-- LLM post-training 分支：RLHF / PPO for LLMs -> GRPO
+- LLM 分支：RLHF / PPO for LLMs -> GRPO
 ```
 
 一句话先压住：
