@@ -1,4 +1,4 @@
-## 第十五章：SAC - 为什么最大熵原则会逼出“既学回报，也保留随机性”的算法？
+## 第十五章：SAC - 为什么最大熵原则会逼出"既学回报，也保留随机性"的算法？
 
 ### 全局导航图
 
@@ -45,7 +45,7 @@ Outcome -> Process -> Verifiable Reward
 
 > 你在这里：连续控制分支 -> SAC
 
-### 序：如果探索不该只是“外加噪声”，那随机性就该进目标函数本身
+### 序：如果探索不该只是"外加噪声"，那随机性就该进目标函数本身
 
 到了 TD3，你会发现它虽然更稳了，但还有一个深层限制：
 
@@ -53,7 +53,7 @@ Outcome -> Process -> Verifiable Reward
 
 这会逼出一个更根本的问题：
 
-> **能不能把“探索”从训练技巧，升级成优化目标的一部分？**
+> **能不能把"探索"从训练技巧，升级成优化目标的一部分？**
 
 一句话先压住：
 
@@ -87,7 +87,7 @@ Outcome -> Process -> Verifiable Reward
 - 探索不足
 - 容易卡住
 
-#### 1.3 所以“探索”不该只是外挂
+#### 1.3 所以"探索"不该只是外挂
 
 这就把问题逼得很明确：
 
@@ -116,81 +116,109 @@ Outcome -> Process -> Verifiable Reward
 
 所以 SAC 的出发点就是：
 
-> **把“探索价值”写进目标函数，而不是只靠训练时手工加噪声。**
+> **把"探索价值"写进目标函数，而不是只靠训练时手工加噪声。**
 
 ---
 
-### 3. Invention：SAC 是怎么长出来的？
+### 3. Invention：从 axioms 出发，SAC 为什么必须这样存在？
 
-#### 3.1 新目标：最大化 reward + entropy
-
-SAC 不再只优化：
+#### 3.0 第一步：找到不可约的 axioms（基础事实）
 
 ```text
-高回报
+Axiom 1: reward maximization → 追求高回报是目标
+Axiom 2: exploration is necessary → 不探索就无法发现更好的策略
+Axiom 3: noise ≠ intrinsic randomness → 外挂噪声不是策略本身的随机性
 ```
 
-而是优化：
+#### 3.1 第二步：如果只有 axioms，会引出什么矛盾？
+
+**从 Axiom 1 + Axiom 2 出发：**
+- reward maximization 会自然导向确定性策略（选最大 Q 值的动作）
+- exploration necessary 需要保持随机性
+- **矛盾！** 最大化 reward 和保持探索性是内在冲突的
+
+DDPG / TD3 的做法：
+```text
+确定性 policy → 外挂噪声 → 强行探索
+```
+但这不是从目标函数本身解决，而是训练技巧层面的补丁。
+
+#### 3.2 第三步：唯一合理的解决方案路径是什么？
+
+如果"探索有价值"这个事实成立（Axiom 2），那有且只有一种方式真正内生化它：
 
 ```text
-高回报 + 高熵
+Option A: 外挂噪声 → ❌ 不是目标函数的一部分
+Option B: entropy 进目标函数 → ✅ 这才是内生化的唯一路径
 ```
 
-更准确地说，是最大化一种最大熵目标：
-- 拿到高 reward
-- 同时策略尽量不要过早塌缩
+为什么必须是 Option B？因为：
+- 优化器只能优化"被明确表达的目标"
+- 如果探索有价值，它就必须出现在 objective 里
+- **所以 `maximize reward + entropy` 是唯一合理的推导结果**
 
-这会带来一个很重要的行为倾向：
-- 如果多个动作价值差不多
-- 策略不会急着只保留一个
+#### 3.3 第四步：如何让它可扩展（compression mechanisms）？
 
-#### 3.2 policy 重新变成 stochastic
-
-和 DDPG / TD3 不同，SAC 通常使用随机策略：
-- policy 输出一个分布
-- 再从中采样动作
-
-这意味着探索不是外挂，而是 policy 自身的一部分。
-
-#### 3.3 Critic 仍然存在，但学的是“带熵修正”的价值结构
-
-SAC 并没有丢掉 Actor-Critic 主线。
-
-它仍然有：
-- Actor
-- Critic（通常是双 Q）
-
-只不过 Bellman target / policy objective 里会带上 entropy 项。
-
-这说明 SAC 的位置不是“完全换路线”，而是：
+纯加 entropy 项会导致数值不稳定。SAC 引入了：
 
 ```text
-Actor-Critic + off-policy + entropy regularization
+L_SAC = E[reward] + α * H(π)
+         ↑           ↑
+    reward 目标    entropy 正则化
+    
+α: temperature parameter → 控制随机性 vs 回报的权衡
 ```
 
-#### 3.4 温度参数 alpha 在控制什么？
+这就是 SAC 最终形式的推导链条。
 
-SAC 里常见一个参数 `alpha`，它控制：
-- reward 重要性
-- entropy 重要性
+#### 3.4 policy 重新变成 stochastic
 
-如果 `alpha` 大：
-- 更鼓励随机性
-
-如果 `alpha` 小：
-- 更偏向纯粹追 reward
-
-所以它本质上是在调节：
-
-> **“确定拿高分” 和 “保留探索弹性” 之间的权衡。**
-
-#### 3.5 一句话压缩
+和 DDPG / TD3 的确定性策略不同：
 
 ```text
-SAC = off-policy Actor-Critic
-    + stochastic policy
-    + entropy 直接进目标函数
+DDPG/TD3: π(s) → a (确定动作)
+SAC:      π(a|s) ~ N(μ, σ²) (概率分布，从中采样)
 ```
+
+这意味着：
+- 探索是 policy 自身的属性
+- entropy 可以被显式计算和优化
+- 模型学到"什么时候该随机、什么时候该确定"
+
+#### 3.5 Critic 的 Bellman target 也要调整
+
+因为 objective 变了，Bellman 方程也要对应调整：
+
+```text
+传统 Q-learning: Q(s,a) = E[r + γQ(s',a')]
+
+SAC Q-learning: Q(s,a) = E[r + γ(Q(s',a') - α log π(a'|s'))]
+                               ↑__________________↑
+                                 entropy 修正项
+```
+
+这说明 SAC 不是"局部修补"，而是从目标函数到 Bellman target 的完整一致性重构。
+
+#### 3.6 一句话压缩推导链
+
+```text
+Axiom: reward + exploration are both necessary  
+Contradiction: deterministic policy kills exploration  
+Solution: entropy must enter objective (only one way)  
+Result: SAC = off-policy Actor-Critic with stochastic π + αH(π)
+```
+
+#### 3.7 检验理解：能否独立重推？
+
+**试着隐藏上面的推导，自己重建：**
+
+1. DDPG/TD3 的确定性策略有什么根本问题？（探索是外挂）
+2. 如果探索有价值，它必须出现在哪里？（目标函数里）
+3. 如何表达"随机性价值"？（entropy）
+4. 所以 objective 是什么？（reward + α*entropy）
+5. policy 要改成什么形式？（stochastic）
+
+**如果能独立推出这 5 步，说明理解了 SAC 的必然性。**
 
 ---
 
