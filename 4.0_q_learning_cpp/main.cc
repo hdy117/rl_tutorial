@@ -47,6 +47,7 @@ int main() {
   const int KMaxSteps = kRows * kCols;
   for (auto i = 0; i < kEpoches; i++) {
     q_learning.Optimize(eplison, KMaxSteps);
+    eplison = static_cast<double>(kEpoches - i) / kEpoches;
   }
 
   // 5.0 Pi
