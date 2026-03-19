@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cmath>
 #include <iostream>
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -32,16 +34,23 @@ const double NormalCellReward = 0.0;
 const double BingoCellReward = 1e2;
 } // namespace cell_reward
 
+const double kInitialQuality = -1.0;
+
 // q-cell data
 struct QCellData {
-  // double rewards_[kActionSpace]{0.0, 0.0, 0.0, 0.0}; // rewards of each
-  // action
-  double reward_{0.0}; // reward at this state
-  double qualitys_[kActionSpace]{0.0, 0.0, 0.0, 0.0,
-                                 0.0}; // qualities with each action
+  double reward_{0.0};             // reward at this state
+  double qualities_[kActionSpace]; // qualities with each action
   CellType cell_type_{CellType::NormalCell};
+
+  // constructor
+  QCellData() {
+    for (auto &quality : qualities_) {
+      quality = kInitialQuality;
+    }
+  }
 };
 
+// q table data
 using RowQCellData = std::vector<QCellData>;
 using QTableData = std::vector<RowQCellData>;
 
@@ -74,8 +83,8 @@ public:
       : gamma_(gamma), alpha_(alpha) {}
 
 public:
-  // optimize q-table
-  void Optimize();
+  // optimize q-table with eplison-greedy
+  void Optimize(int n_epoches = 3000, double initial_epsilon = 1.0);
 
 public:
   void Pi();

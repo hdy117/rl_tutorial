@@ -37,7 +37,7 @@ void QTable::ShowQCellData(const QCellData &cell_data) {
 
   std::cout << "] [Q-Values: ";
   for (int i = 0; i < kActionSpace; ++i) {
-    std::cout << cell_data.qualitys_[i];
+    std::cout << cell_data.qualities_[i];
     if (i < kActionSpace - 1)
       std::cout << ", ";
   }
