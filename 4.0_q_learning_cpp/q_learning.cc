@@ -58,7 +58,7 @@ void QTable::ShowQCellData(const QCellData &cell_data) {
     if (i < kActionSpace - 1)
       std::cout << ", ";
   }
-  std::cout << "]";
+  std::cout << "]\n";
 }
 
 // update cell type
@@ -114,7 +114,7 @@ double QLearning::Random01() {
 }
 
 // random action
-int RandomAction(int action_space) {
+int QLearning::RandomAction(int action_space) {
   static std::random_device rd;
   static std::mt19937 gen(rd());
   std::uniform_int_distribution<> dis(0, action_space - 1);
@@ -134,6 +134,12 @@ void QLearning::Optimize(double epsilon, int max_steps) {
   for (auto i = 0; i < max_steps; ++i) {
     // get current cell
     auto &cur_cell = q_table_->MutableCellData(cur_r, cur_c);
+
+    // early return
+    if (cur_cell.cell_type_ == CellType::BingoCell) {
+      LOG_INFO << "bingo cell reached, return now";
+      return;
+    }
 
     // update quality of actions at this state
     for (auto action_i = 0; action_i < kActionSpace; ++action_i) {
@@ -183,14 +189,79 @@ void QLearning::Optimize(double epsilon, int max_steps) {
   }
 }
 
+// save q-learning
+void QLearning::Save(const std::string &data_file) {
+  std::ofstream ofs(data_file, std::ios::binary);
+  if (!ofs.is_open()) {
+    LOG_ERROR << "failed to open file for saving: " << data_file << "\n";
+    return;
+  }
+
+  // save rows and cols
+  ofs.write(reinterpret_cast<const char *>(&q_table_->rows_),
+            sizeof(q_table_->rows_));
+  ofs.write(reinterpret_cast<const char *>(&q_table_->cols_),
+            sizeof(q_table_->cols_));
+
+  // save q-table data
+  for (const auto &row : q_table_->GetQTabelData()) {
+    for (const auto &cell : row) {
+      ofs.write(reinterpret_cast<const char *>(&cell.reward_),
+                sizeof(cell.reward_));
+      ofs.write(reinterpret_cast<const char *>(cell.qualities_),
+                sizeof(cell.qualities_));
+      int cell_type = static_cast<int>(cell.cell_type_);
+      ofs.write(reinterpret_cast<const char *>(&cell_type), sizeof(cell_type));
+    }
+  }
+
+  ofs.close();
+  LOG_INFO << "q-learning model saved to: " << data_file << "\n";
+}
+
+// load q-learning
+void QLearning::Load(const std::string &data_file) {
+  std::ifstream ifs(data_file, std::ios::binary);
+  if (!ifs.is_open()) {
+    LOG_ERROR << "failed to open file for loading: " << data_file << "\n";
+    return;
+  }
+
+  // load rows and cols
+  int rows = 0, cols = 0;
+  ifs.read(reinterpret_cast<char *>(&rows), sizeof(rows));
+  ifs.read(reinterpret_cast<char *>(&cols), sizeof(cols));
+
+  // reinitialize table if size changed
+  if (rows != q_table_->rows_ || cols != q_table_->cols_) {
+    q_table_->InitializeTable(rows, cols);
+  }
+
+  // load q-table data using MutableCellData
+  for (auto r = 0; r < rows; ++r) {
+    for (auto c = 0; c < cols; ++c) {
+      auto &cell = q_table_->MutableCellData(r, c);
+      ifs.read(reinterpret_cast<char *>(&cell.reward_), sizeof(cell.reward_));
+      ifs.read(reinterpret_cast<char *>(cell.qualities_),
+               sizeof(cell.qualities_));
+      int cell_type = 0;
+      ifs.read(reinterpret_cast<char *>(&cell_type), sizeof(cell_type));
+      cell.cell_type_ = static_cast<CellType>(cell_type);
+    }
+  }
+
+  ifs.close();
+  LOG_INFO << "q-learning model loaded from: " << data_file << "\n";
+}
+
 // find path to bingo point
-void QLearning::Pi(int r, int c) {
+void QLearning::Pi(int r, int c, int max_steps) {
   // current cell state
 
   bool bingo = false;
-  int cur_r = r, cur_c = c;
+  int cur_r = r, cur_c = c, step_counter = 0;
 
-  while (!bingo) {
+  while (!bingo && step_counter < max_steps) {
 
     int best_action = action::kActionNoMove;
     double best_q_s_a = kBoardQuality;
@@ -218,5 +289,8 @@ void QLearning::Pi(int r, int c) {
 
     // act
     q_table_->UpdateCellWithAction(cur_r, cur_c, best_action);
+
+    // update step counter
+    step_counter++;
   }
 }

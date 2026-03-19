@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -126,17 +127,23 @@ public:
 
 public:
   // find path to bingo point
-  void Pi(int r, int c);
+  void Pi(int r, int c, int max_steps = kRows * kCols);
 
 public:
   // random double, (0,1.0)
-  double Random01() {}
+  double Random01();
 
   // random r, c
   void RandomRowCol(int &r, int &c);
 
   // random action
   int RandomAction(int action_space = kActionSpace);
+
+  // save q-learning
+  void Save(const std::string &data_file = "./q_learning.data");
+
+  // load q-learning
+  void Load(const std::string &data_file = "./q_learning.data");
 
 protected:
   double gamma_{0.9};  // gamma in bellman function, how you value future
