@@ -9,7 +9,7 @@
 #define LOG_ERROR std::cerr << __FILE__ << ":" << __LINE__ << ":"
 
 // number of action space
-const int kActionSpace = 4;
+const int kActionSpace = 5;
 
 // actions
 namespace action {
@@ -17,6 +17,7 @@ const int kActionUp = 0;
 const int kActionDown = 1;
 const int kActionLeft = 2;
 const int kActionRight = 3;
+const int kActionNoMove = 4;
 } // namespace action
 
 // one table that agent can move
@@ -26,9 +27,9 @@ const int kCols = 128;
 // cell type
 enum class CellType { TrapCell, NormalCell, BingoCell };
 namespace cell_reward {
-const double TrapCellReward = -1e6;
+const double TrapCellReward = -1e2;
 const double NormalCellReward = 0.0;
-const double BingoCellReward = 1e3;
+const double BingoCellReward = 1e2;
 } // namespace cell_reward
 
 // q-cell data
@@ -36,7 +37,7 @@ struct QCellData {
   // double rewards_[kActionSpace]{0.0, 0.0, 0.0, 0.0}; // rewards of each
   // action
   double reward_{0.0}; // reward at this state
-  double qualitys_[kActionSpace]{0.0, 0.0, 0.0,
+  double qualitys_[kActionSpace]{0.0, 0.0, 0.0, 0.0,
                                  0.0}; // qualities with each action
   CellType cell_type_{CellType::NormalCell};
 };
