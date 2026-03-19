@@ -143,27 +143,31 @@ void QLearning::Optimize(double epsilon, int max_steps) {
     }
 
     // update quality of actions at this state
+    int best_action = action::kActionNoMove;
+    double max_next_q_s_a = kBoardQuality;
     for (auto action_i = 0; action_i < kActionSpace; ++action_i) {
       // next state with current state-action
       int r = cur_r, c = cur_c;
-      double max_next_q_s_a = kBoardQuality;
       auto ret = q_table_->UpdateCellWithAction(r, c, action_i);
       if (ret) {
         auto &next_cell = q_table_->MutableCellData(r, c);
-        max_next_q_s_a = q_table_->MaxQualityOf(next_cell);
+        auto next_q_s_a = q_table_->MaxQualityOf(next_cell);
+        if (next_q_s_a > max_next_q_s_a) {
+          max_next_q_s_a = next_q_s_a;
+          best_action = action_i;
+        }
       }
-
-      // update quality of this state-action, reward + arg max(Q(s',a')) vs a'
-      double bellman_target = cur_cell.reward() + gamma_ * max_next_q_s_a;
-      double q_s_a = cur_cell.qualities(action_i); //  Q(s,a)
-      double td_error = bellman_target - q_s_a;
-      cur_cell.set_qualities(action_i, q_s_a + alpha_ * td_error);
     }
+    LOG_INFO << "best action:" << best_action
+             << ", max next q_s_a:" << max_next_q_s_a << "\n";
+    // update quality of this state-action, reward + arg max(Q(s',a')) vs a'
+    double bellman_target = cur_cell.reward() + gamma_ * max_next_q_s_a;
+    double q_s_a = cur_cell.qualities(best_action); //  Q(s,a)
+    double td_error = bellman_target - q_s_a;
+    cur_cell.set_qualities(best_action, q_s_a + alpha_ * td_error);
 
     // make an action with epslison used
     auto cur_eplison = Random01();
-    LOG_INFO << "cur random eplison:" << cur_eplison
-             << ", input eplison:" << epsilon << "\n";
     if (cur_eplison < epsilon) {
       // random action, exploration
       auto random_action_i = RandomAction(kActionSpace);

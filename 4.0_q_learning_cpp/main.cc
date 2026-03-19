@@ -75,20 +75,21 @@ int main(int argc, char *argv[]) {
     // 1.0 optimize
     PrintSeperator();
     OptimizeQLearning();
+  } else {
+
+    // 2.0 load
+    PrintSeperator();
+    QLearning q_learning;
+    q_learning.Load();
+    LOG_INFO << "loaded.\n";
+
+    // 3.0 Pi
+    PrintSeperator();
+    int r = 0, c = 0;
+    q_learning.RandomRowCol(r, c);
+    q_learning.Pi(r, c, 100);
+    LOG_INFO << "done.\n";
   }
-
-  // 2.0 load
-  PrintSeperator();
-  QLearning q_learning;
-  q_learning.Load();
-  LOG_INFO << "loaded.\n";
-
-  // 3.0 Pi
-  PrintSeperator();
-  int r = 0, c = 0;
-  q_learning.RandomRowCol(r, c);
-  q_learning.Pi(r, c, 100);
-  LOG_INFO << "done.\n";
 
   return 0;
 }

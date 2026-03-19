@@ -26,7 +26,7 @@ echo "Building..."
 make -j$(nproc)
 
 # Copy json file for testing
-cp ../q_learning.json . 2>/dev/null || true
+# cp ../q_learning.json . 2>/dev/null || true
 
 echo ""
 echo "========================================"

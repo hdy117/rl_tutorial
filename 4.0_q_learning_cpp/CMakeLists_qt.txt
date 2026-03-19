@@ -41,8 +41,8 @@ add_executable(qt_visualizer
 target_link_libraries(qt_visualizer Qt6::Core Qt6::Widgets ${Protobuf_LIBRARIES})
 
 # Copy json file to build directory
-add_custom_command(TARGET qt_visualizer POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different
-  ${CMAKE_SOURCE_DIR}/../q_learning.json
-  ${CMAKE_BINARY_DIR}/q_learning.json
-)
+# add_custom_command(TARGET qt_visualizer POST_BUILD
+#  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+#  ${CMAKE_SOURCE_DIR}/../q_learning.json
+#  ${CMAKE_BINARY_DIR}/q_learning.json
+#)
