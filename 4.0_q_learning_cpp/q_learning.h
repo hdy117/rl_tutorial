@@ -34,8 +34,10 @@ const double NormalCellReward = 0.0;
 const double BingoCellReward = 1e2;
 } // namespace cell_reward
 
-// initial quality of q(s,a)
+// initial quality of q(s,a)， negative quality will speed up find shortest path
+// although gamma will help to find shortest path
 const double kInitialQuality = -0.1;
+const double kBoardQuality = -1e4;
 
 // q-cell data
 struct QCellData {
@@ -55,6 +57,9 @@ struct QCellData {
 using RowQCellData = std::vector<QCellData>;
 using QTableData = std::vector<RowQCellData>;
 
+class QTable;
+using QTablePtr = std::shared_ptr<QTable>;
+
 // q-table
 class QTable {
 public:
@@ -73,9 +78,37 @@ public:
   // get table
   const QTableData &GetQTabelData() const { return q_table_data_; }
 
+  // mutable cell data
+  QCellData &MutableCellData(int r, int c) { return q_table_data_.at(r).at(c); }
+
+  // is valid action
+  bool UpdateCellWithAction(int &cur_r, int &cur_c, int action) {
+    int &r = cur_r, &c = cur_c;
+    if (action == action::kActionDown) {
+      r++;
+    } else if (action == action::kActionUp) {
+      r--;
+    } else if (action == action::kActionLeft) {
+      c--;
+    } else if (action == action::kActionRight) {
+      c++;
+    }
+
+    if (r >= 0 && r < rows_ && c >= 0 && c < cols_) {
+      return true;
+    }
+
+    return false;
+  }
+
+  // get max quality of cell state-actions
+  double MaxQualityOf(const QCellData &cell);
+
+public:
+  int rows_{0}, cols_{0}; // rows, cols
+
 protected:
   QTableData q_table_data_; // q table data
-  int rows_{0}, cols_{0};   // rows, cols
 };
 
 class QLearning {
@@ -84,14 +117,29 @@ public:
       : gamma_(gamma), alpha_(alpha) {}
 
 public:
-  // optimize q-table with eplison-greedy
-  void Optimize(int n_epoches = 3000, double initial_epsilon = 1.0);
+  // set bingo and trap cell
+  void AcceptQTable(QTablePtr q_table) { q_table_ = q_table; }
+
+  // optimize q-table with eplison-greedy, also limit agent max steps in case of
+  // stuck somewhere
+  void Optimize(double epsilon = 1.0, int max_steps = kRows * kCols);
 
 public:
-  void Pi();
+  // find path to bingo point
+  void Pi(int r, int c);
+
+public:
+  // random double, (0,1.0)
+  double Random01() {}
+
+  // random r, c
+  void RandomRowCol(int &r, int &c);
+
+  // random action
+  int RandomAction(int action_space = kActionSpace);
 
 protected:
   double gamma_{0.9};  // gamma in bellman function, how you value future
   double alpha_{0.01}; // learning rate, how much take from TD error each step
-  QTable q_table_;     // quality table
+  QTablePtr q_table_;  // quality table
 };
