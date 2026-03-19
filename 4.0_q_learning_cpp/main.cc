@@ -58,8 +58,8 @@ void OptimizeQLearning(bool resume = false) {
 
   // 2.0 optimize
   PrintSeperator();
-  const int kEpoches = resume ? 5000 : 20000; // Fewer epochs if resuming
-  double epsilon = resume ? 0.3 : 1.0;        // Lower epsilon if resuming
+  const int kEpoches = 20000;
+  double epsilon = 1.0;
   const int KMaxSteps = kRows * kCols;
 
   LOG_INFO << "Training for " << kEpoches
