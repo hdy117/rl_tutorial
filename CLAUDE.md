@@ -4,33 +4,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Common commands
 
-- Install dependencies: `pip install -r requirements.txt`
-- Run the introductory CartPole walkthrough: `python 01_intro.py`
-- Run the random-agent baseline and write `random_scores.npy`: `python 02_random_agent.py`
-- Train the tabular Q-learning agent and write `q_learning_scores.npy` plus `q_table.npy`: `python 03_q_learning.py`
-- Plot saved results and write `training_curve.png`: `python plot_results.py`
-- Re-run the full experiment pipeline from the repo root: `python 02_random_agent.py && python 03_q_learning.py && python plot_results.py`
+- Install Python dependencies used by the tutorial tooling: `pip install -r requirements.txt`
+- Regenerate the merged tutorial document from the repo root: `python merge_tutorial.py`
+- Build the Bellman DAG example: `cd 3.0_bellman_cpp_cheese_example && ./build.sh`
+- Run the Bellman DAG example: `./3.0_bellman_cpp_cheese_example/build/bellman_update_cheese_example`
+- Build the Q-learning C++ example: `cd 4.0_q_learning_cpp && ./build.sh`
+- Run the Q-learning C++ example: `./4.0_q_learning_cpp/build/qlearning`
 
 ## Validation
 
-- There is currently no formal test suite, linter, or build system configured in this repository.
-- Validate changes by re-running the affected script from the repository root.
-- For end-to-end changes, use the full pipeline command above so the `.npy` artifacts and plot are regenerated together.
-- There is no single-test command yet because no test framework is configured.
+- There is no formal test suite, linter, or CI configuration in this repository.
+- There is no single-test command today; validate by running the generator or the relevant demo executable after your change.
+- For tutorial index or chapter edits, run `python merge_tutorial.py` and inspect the regenerated `RL_Tutorial_Full.md`.
+- For C++ demo changes, rebuild the affected subproject and run its executable.
+- Both C++ `build.sh` scripts delete and recreate their local `build/` directory before invoking CMake.
 
 ## Architecture overview
 
-- This is a flat, script-driven Python tutorial project, not a packaged library. The repository is organized around runnable lesson scripts plus one long teaching document.
-- `RL_Tutorial.md` is the main narrative/tutorial document. It explains the RL concepts and roadmap, while the Python scripts provide concrete runnable examples.
-- `01_intro.py` is the environment-inspection step: it creates `CartPole-v1`, prints the action/state meaning, and manually steps through the environment to illustrate state, action, reward, and episode termination.
-- `02_random_agent.py` is the baseline experiment: it runs many episodes with random actions, reports score statistics, and saves `random_scores.npy` for later comparison.
-- `03_q_learning.py` is the main learning script: it discretizes the continuous CartPole observation into buckets, uses an epsilon-greedy policy, updates a tabular Q-table with the Bellman target, and saves both `q_learning_scores.npy` and `q_table.npy`.
-- `plot_results.py` is the reporting layer: it loads the saved `.npy` artifacts, plots the training curve and baseline-vs-trained comparison, and saves `training_curve.png`.
+- This repository is documentation-first. `RL_Tutorial.md` is the tutorial index and reading map, while `chapters/*.md` contains the actual chapter source.
+- `merge_tutorial.py` is the glue between the index and the split chapters. It parses the chapter table in `RL_Tutorial.md`, preserves the navigation and learning-path sections, and concatenates the chapter files into `RL_Tutorial_Full.md`.
+- `RL_Tutorial_Full.md` is a generated artifact. Edit `RL_Tutorial.md` or files under `chapters/` instead of hand-editing the merged file.
+- `3.0_bellman_cpp_cheese_example/` is a small Bellman-value teaching demo. `dag.h` defines graph nodes plus traversal/path helpers, and `bellman_update.cc` adds Bellman backup logic and greedy policy extraction on top of that DAG.
+- `4.0_q_learning_cpp/` is a separate Q-learning teaching scaffold. `q_learning.h` defines actions, cell types, and the Q-table shape; `q_learning.cc` implements table initialization and cell reward updates; `main.cc` currently serves as a small smoke-test-style entrypoint.
+- The numbered markdown chapters and numbered C++ demo directories are conceptually aligned as a learning sequence, so explanation changes should stay consistent across the tutorial text and the corresponding demos.
 
 ## Working assumptions in this repo
 
-- Scripts communicate through files in the repository root rather than through shared Python modules. Run commands from the repo root so reads/writes to `.npy` files resolve correctly.
-- The numbered scripts form a teaching sequence. If you extend the tutorial, preserve that staged flow unless you are intentionally refactoring the project structure.
-- `RL_Tutorial.md` and `03_q_learning.py` are already coupled conceptually: the markdown explains the Bellman/Q-table logic that the script implements. When changing the algorithm description, variable naming, or learning flow, check both files.
-- `01_intro.py` and `02_random_agent.py` create CartPole with `sutton_barto_reward=True`, while `03_q_learning.py` uses the default CartPole reward behavior. If you change scoring, evaluation, or comparisons, verify that the reward assumptions remain consistent across scripts.
-- Files such as `random_scores.npy`, `q_learning_scores.npy`, `q_table.npy`, and `training_curve.png` are generated outputs, not primary source files.
+- The chapter table format in `RL_Tutorial.md` is part of the merge contract. `merge_tutorial.py` expects rows like `| 第X章 | 标题 | [file](path) |`, so changes to that table structure require updating the parser as well.
+- Chapter filenames and links include Chinese characters and punctuation; keep paths exact when editing the index.
+- Generated artifacts are limited and should usually be treated as derived output: `RL_Tutorial_Full.md` and each C++ subproject's `build/` directory.
+- Run commands from the repository root unless a subproject build script explicitly expects to be run from inside its own directory.
