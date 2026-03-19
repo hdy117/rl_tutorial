@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package qlearning;
+
+// Cell type enum
+enum CellType {
+  TRAP_CELL = 0;
+  NORMAL_CELL = 1;
+  BINGO_CELL = 2;
+}
+
+// Q-cell data for a single state
+message QCellData {
+  double reward = 1;
+  repeated double qualities = 2;
+  CellType cell_type = 3;
+}
+
+// Row of Q-cell data
+message RowQCellData {
+  repeated QCellData cells = 1;
+}
+
+// Complete Q-table data
+message QTableData {
+  repeated RowQCellData rows = 1;
+}
+
+// Complete Q-learning model for save/load
+message QLearningModel {
+  int32 rows = 1;
+  int32 cols = 2;
+  QTableData q_table_data = 3;
+}

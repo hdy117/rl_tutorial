@@ -1,2 +1,4 @@
 build/*
 build
+build_qt
+build_qt/*

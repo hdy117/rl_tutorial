@@ -1,47 +1,54 @@
 #include "q_learning.h"
 
+#include <google/protobuf/util/json_util.h>
+
+using google::protobuf::util::JsonStringToMessage;
+using google::protobuf::util::MessageToJsonString;
+
 void QTable::InitializeTable(int rows, int cols) {
   // update shape
   rows_ = rows;
   cols_ = cols;
 
-  // q table
-  q_table_data_.reserve(rows);
+  // clear and initialize q table data
+  q_table_data_.Clear();
 
   // initial table
   for (auto r = 0; r < rows; r++) {
     // one row
-    RowQCellData one_row;
-    one_row.reserve(cols);
+    auto *one_row = q_table_data_.add_rows();
     for (auto c = 0; c < cols; c++) {
-      one_row.push_back(QCellData());
+      auto *cell = one_row->add_cells();
+      cell->set_reward(0.0);
+      cell->set_cell_type(qlearning::NORMAL_CELL);
+      for (int i = 0; i < kActionSpace; ++i) {
+        cell->add_qualities(kInitialQuality);
+      }
     }
-
-    // save this row
-    q_table_data_.push_back(one_row);
   }
 
   // set default state-action quality for boarder cells
   for (auto r = 0; r < rows_; ++r) {
-    auto &cell = q_table_data_.at(r).at(0);
-    cell.qualities_[action::kActionLeft] = kBoardQuality;
+    auto &cell = MutableCellData(r, 0);
+    cell.set_qualities(action::kActionLeft, kBoardQuality);
 
-    auto &cell_right = q_table_data_.at(r).at(cols_ - 1);
-    cell_right.qualities_[action::kActionRight] = kBoardQuality;
+    auto &cell_right = MutableCellData(r, cols_ - 1);
+    cell_right.set_qualities(action::kActionRight, kBoardQuality);
   }
   for (auto c = 0; c < cols_; ++c) {
-    auto &cell = q_table_data_.at(0).at(c);
-    cell.qualities_[action::kActionUp] = kBoardQuality;
+    auto &cell = MutableCellData(0, c);
+    cell.set_qualities(action::kActionUp, kBoardQuality);
 
-    auto &cell_right = q_table_data_.at(rows_ - 1).at(c);
-    cell_right.qualities_[action::kActionDown] = kBoardQuality;
+    auto &cell_right = MutableCellData(rows_ - 1, c);
+    cell_right.set_qualities(action::kActionDown, kBoardQuality);
   }
 }
 
 void QTable::ShowTable() {
-  for (const auto &row : q_table_data_) {
-    for (const auto &cell : row) {
-      ShowQCellData(cell);
+  for (int r = 0; r < q_table_data_.rows_size(); ++r) {
+    const auto &row = q_table_data_.rows(r);
+    for (int c = 0; c < row.cells_size(); ++c) {
+      ShowQCellData(row.cells(c));
       std::cout << "\t";
     }
     std::cout << "\n";
@@ -49,16 +56,7 @@ void QTable::ShowTable() {
 }
 
 void QTable::ShowQCellData(const QCellData &cell_data) {
-  std::cout << "[Reward: ";
-  std::cout << cell_data.reward_;
-
-  std::cout << "] [Q-Values: ";
-  for (int i = 0; i < kActionSpace; ++i) {
-    std::cout << cell_data.qualities_[i];
-    if (i < kActionSpace - 1)
-      std::cout << ", ";
-  }
-  std::cout << "]\n";
+  LOG_INFO << cell_data.DebugString() << "\n";
 }
 
 // update cell type
@@ -70,16 +68,17 @@ void QTable::UpdateCellType(int r, int c, CellType cell_type) {
   }
 
   // get cell
-  auto &cell = q_table_data_.at(r).at(c);
-  cell.cell_type_ = cell_type;
+  auto &cell = MutableCellData(r, c);
+  cell.set_cell_type(cell_type);
 
   // update reward data
-  cell.reward_ = cell_reward::NormalCellReward;
-  if (cell.cell_type_ == CellType::BingoCell) {
-    cell.reward_ = cell_reward::BingoCellReward;
-  } else if (cell.cell_type_ == CellType::TrapCell) {
-    cell.reward_ = cell_reward::TrapCellReward;
+  double reward = cell_reward::NormalCellReward;
+  if (cell_type == qlearning::BINGO_CELL) {
+    reward = cell_reward::BingoCellReward;
+  } else if (cell_type == qlearning::TRAP_CELL) {
+    reward = cell_reward::TrapCellReward;
   }
+  cell.set_reward(reward);
 }
 
 // get max quality of cell state-actions
@@ -87,8 +86,8 @@ double QTable::MaxQualityOf(const QCellData &cell) {
   // best quality if among this state-actions
   double best_quality = -1e9;
   for (auto action_i = 0; action_i < kActionSpace; action_i++) {
-    if (cell.qualities_[action_i] > best_quality) {
-      best_quality = cell.qualities_[action_i];
+    if (cell.qualities(action_i) > best_quality) {
+      best_quality = cell.qualities(action_i);
     }
   }
   return best_quality;
@@ -129,14 +128,16 @@ void QLearning::Optimize(double epsilon, int max_steps) {
 
   // random start position
   RandomRowCol(cur_r, cur_c);
+  LOG_INFO << "===============================================\n";
   LOG_INFO << "optimize start r:" << cur_r << ", c:" << cur_c << "\n";
 
   for (auto i = 0; i < max_steps; ++i) {
     // get current cell
     auto &cur_cell = q_table_->MutableCellData(cur_r, cur_c);
+    LOG_INFO << "current cell r:" << cur_r << ", c:" << cur_c << "\n";
 
     // early return
-    if (cur_cell.cell_type_ == CellType::BingoCell) {
+    if (cur_cell.cell_type() == qlearning::BINGO_CELL) {
       LOG_INFO << "bingo cell reached, return now";
       return;
     }
@@ -153,10 +154,10 @@ void QLearning::Optimize(double epsilon, int max_steps) {
       }
 
       // update quality of this state-action, reward + arg max(Q(s',a')) vs a'
-      double bellman_target = cur_cell.reward_ + gamma_ * max_next_q_s_a;
-      double q_s_a = cur_cell.qualities_[action_i]; //  Q(s,a)
+      double bellman_target = cur_cell.reward() + gamma_ * max_next_q_s_a;
+      double q_s_a = cur_cell.qualities(action_i); //  Q(s,a)
       double td_error = bellman_target - q_s_a;
-      cur_cell.qualities_[action_i] = q_s_a + alpha_ * td_error;
+      cur_cell.set_qualities(action_i, q_s_a + alpha_ * td_error);
     }
 
     // make an action with epslison used
@@ -178,8 +179,8 @@ void QLearning::Optimize(double epsilon, int max_steps) {
       int best_action = action::kActionNoMove;
       double best_q_s_a = kBoardQuality;
       for (auto action_i = 0; action_i < kActionSpace; ++action_i) {
-        if (cur_cell.qualities_[action_i] > best_q_s_a) {
-          best_q_s_a = cur_cell.qualities_[action_i];
+        if (cur_cell.qualities(action_i) > best_q_s_a) {
+          best_q_s_a = cur_cell.qualities(action_i);
           best_action = action_i;
         }
       }
@@ -189,68 +190,64 @@ void QLearning::Optimize(double epsilon, int max_steps) {
   }
 }
 
-// save q-learning
+// save q-learning using proto JSON
 void QLearning::Save(const std::string &data_file) {
-  std::ofstream ofs(data_file, std::ios::binary);
+  qlearning::QLearningModel model;
+  model.set_rows(q_table_->rows_);
+  model.set_cols(q_table_->cols_);
+  *model.mutable_q_table_data() = q_table_->GetQTabelData();
+
+  std::string json_string;
+  auto status = MessageToJsonString(model, &json_string);
+  if (!status.ok()) {
+    LOG_ERROR << "failed to serialize model to JSON: " << status.ToString()
+              << "\n";
+    return;
+  }
+
+  std::ofstream ofs(data_file);
   if (!ofs.is_open()) {
     LOG_ERROR << "failed to open file for saving: " << data_file << "\n";
     return;
   }
 
-  // save rows and cols
-  ofs.write(reinterpret_cast<const char *>(&q_table_->rows_),
-            sizeof(q_table_->rows_));
-  ofs.write(reinterpret_cast<const char *>(&q_table_->cols_),
-            sizeof(q_table_->cols_));
-
-  // save q-table data
-  for (const auto &row : q_table_->GetQTabelData()) {
-    for (const auto &cell : row) {
-      ofs.write(reinterpret_cast<const char *>(&cell.reward_),
-                sizeof(cell.reward_));
-      ofs.write(reinterpret_cast<const char *>(cell.qualities_),
-                sizeof(cell.qualities_));
-      int cell_type = static_cast<int>(cell.cell_type_);
-      ofs.write(reinterpret_cast<const char *>(&cell_type), sizeof(cell_type));
-    }
-  }
-
+  ofs << json_string;
   ofs.close();
   LOG_INFO << "q-learning model saved to: " << data_file << "\n";
 }
 
-// load q-learning
+// load q-learning using proto JSON
 void QLearning::Load(const std::string &data_file) {
-  std::ifstream ifs(data_file, std::ios::binary);
+  std::ifstream ifs(data_file);
   if (!ifs.is_open()) {
     LOG_ERROR << "failed to open file for loading: " << data_file << "\n";
     return;
   }
 
-  // load rows and cols
-  int rows = 0, cols = 0;
-  ifs.read(reinterpret_cast<char *>(&rows), sizeof(rows));
-  ifs.read(reinterpret_cast<char *>(&cols), sizeof(cols));
+  std::string json_string((std::istreambuf_iterator<char>(ifs)),
+                          std::istreambuf_iterator<char>());
+  ifs.close();
+
+  qlearning::QLearningModel model;
+  auto status = JsonStringToMessage(json_string, &model);
+  if (!status.ok()) {
+    LOG_ERROR << "failed to parse JSON: " << status.ToString() << "\n";
+    return;
+  }
+
+  // create q_table_ if not exists
+  if (!q_table_) {
+    q_table_ = std::make_shared<QTable>();
+  }
 
   // reinitialize table if size changed
-  if (rows != q_table_->rows_ || cols != q_table_->cols_) {
-    q_table_->InitializeTable(rows, cols);
+  if (model.rows() != q_table_->rows_ || model.cols() != q_table_->cols_) {
+    q_table_->InitializeTable(model.rows(), model.cols());
   }
 
-  // load q-table data using MutableCellData
-  for (auto r = 0; r < rows; ++r) {
-    for (auto c = 0; c < cols; ++c) {
-      auto &cell = q_table_->MutableCellData(r, c);
-      ifs.read(reinterpret_cast<char *>(&cell.reward_), sizeof(cell.reward_));
-      ifs.read(reinterpret_cast<char *>(cell.qualities_),
-               sizeof(cell.qualities_));
-      int cell_type = 0;
-      ifs.read(reinterpret_cast<char *>(&cell_type), sizeof(cell_type));
-      cell.cell_type_ = static_cast<CellType>(cell_type);
-    }
-  }
+  // copy q-table data
+  q_table_->MutableQTableData() = model.q_table_data();
 
-  ifs.close();
   LOG_INFO << "q-learning model loaded from: " << data_file << "\n";
 }
 
@@ -270,22 +267,26 @@ void QLearning::Pi(int r, int c, int max_steps) {
     const auto &cur_cell = q_table_->MutableCellData(cur_r, cur_c);
 
     // print cell info
-    LOG_INFO << "==============================\n";
+    LOG_INFO << "===============step:" << step_counter << "===============\n";
+    LOG_INFO << "cur_r:" << cur_r << ", cur_c:" << cur_c << "\n";
     q_table_->ShowQCellData(cur_cell);
 
     // check if find bingo
-    if (cur_cell.cell_type_ == CellType::BingoCell) {
+    if (cur_cell.cell_type() == qlearning::BINGO_CELL) {
       LOG_INFO << "bingo!!!\n";
       return;
     }
 
     // find best action in this state
     for (auto action_i = 0; action_i < kActionSpace; ++action_i) {
-      if (cur_cell.qualities_[action_i] > best_q_s_a) {
+      if (cur_cell.qualities(action_i) > best_q_s_a) {
         best_action = action_i;
-        best_q_s_a = cur_cell.qualities_[action_i];
+        best_q_s_a = cur_cell.qualities(action_i);
       }
     }
+
+    LOG_INFO << "best action is " << best_action
+             << ", best_q_s_a:" << best_q_s_a << "\n";
 
     // act
     q_table_->UpdateCellWithAction(cur_r, cur_c, best_action);

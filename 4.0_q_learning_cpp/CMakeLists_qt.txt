@@ -1,0 +1,48 @@
+cmake_minimum_required(VERSION 3.16)
+project(QTVisualizer)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+# Find Qt6
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets)
+
+# Find Protobuf
+find_package(Protobuf REQUIRED)
+
+# Generate protobuf files
+set(PROTO_FILE "${CMAKE_SOURCE_DIR}/../q_learning.proto")
+set(PROTO_GEN_DIR "${CMAKE_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY ${PROTO_GEN_DIR})
+
+execute_process(
+  COMMAND ${Protobuf_PROTOC_EXECUTABLE} 
+    --cpp_out=${PROTO_GEN_DIR}
+    --proto_path=${CMAKE_SOURCE_DIR}/..
+    ${PROTO_FILE}
+  RESULT_VARIABLE protoc_result
+)
+
+if(NOT protoc_result EQUAL 0)
+  message(FATAL_ERROR "Failed to generate protobuf files")
+endif()
+
+include_directories(${PROTO_GEN_DIR})
+include_directories(${Protobuf_INCLUDE_DIRS})
+
+add_executable(qt_visualizer
+  qt_visualizer.cc
+  ${PROTO_GEN_DIR}/q_learning.pb.cc
+)
+
+target_link_libraries(qt_visualizer Qt6::Core Qt6::Widgets ${Protobuf_LIBRARIES})
+
+# Copy json file to build directory
+add_custom_command(TARGET qt_visualizer POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+  ${CMAKE_SOURCE_DIR}/../q_learning.json
+  ${CMAKE_BINARY_DIR}/q_learning.json
+)

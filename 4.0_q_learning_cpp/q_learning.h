@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "q_learning.pb.h"
+
 #define LOG_INFO std::cout << __FILE__ << ":" << __LINE__ << ":"
 #define LOG_ERROR std::cerr << __FILE__ << ":" << __LINE__ << ":"
 
@@ -27,8 +29,8 @@ const int kActionNoMove = 4;
 const int kRows = 64;
 const int kCols = 128;
 
-// cell type
-enum class CellType { TrapCell, NormalCell, BingoCell };
+// cell type (alias for proto enum)
+using CellType = qlearning::CellType;
 namespace cell_reward {
 const double TrapCellReward = -1e2;
 const double NormalCellReward = 0.0;
@@ -37,26 +39,13 @@ const double BingoCellReward = 1e2;
 
 // initial quality of q(s,a)， negative quality will speed up find shortest path
 // although gamma will help to find shortest path
-const double kInitialQuality = -0.1;
-const double kBoardQuality = -1e4;
+const double kInitialQuality = 0.0;
+const double kBoardQuality = -1e3;
 
-// q-cell data
-struct QCellData {
-  double reward_{0.0};             // reward at this state
-  double qualities_[kActionSpace]; // qualities with each action
-  CellType cell_type_{CellType::NormalCell};
-
-  // constructor
-  QCellData() {
-    for (auto &quality : qualities_) {
-      quality = kInitialQuality;
-    }
-  }
-};
-
-// q table data
-using RowQCellData = std::vector<QCellData>;
-using QTableData = std::vector<RowQCellData>;
+// alias for proto-generated types
+using QCellData = qlearning::QCellData;
+using RowQCellData = qlearning::RowQCellData;
+using QTableData = qlearning::QTableData;
 
 class QTable;
 using QTablePtr = std::shared_ptr<QTable>;
@@ -79,8 +68,13 @@ public:
   // get table
   const QTableData &GetQTabelData() const { return q_table_data_; }
 
+  // mutable table data (for save/load)
+  QTableData &MutableQTableData() { return q_table_data_; }
+
   // mutable cell data
-  QCellData &MutableCellData(int r, int c) { return q_table_data_.at(r).at(c); }
+  QCellData &MutableCellData(int r, int c) {
+    return *q_table_data_.mutable_rows(r)->mutable_cells(c);
+  }
 
   // is valid action
   bool UpdateCellWithAction(int &cur_r, int &cur_c, int action) {
@@ -108,7 +102,7 @@ public:
 public:
   int rows_{0}, cols_{0}; // rows, cols
 
-protected:
+public:
   QTableData q_table_data_; // q table data
 };
 
@@ -140,10 +134,10 @@ public:
   int RandomAction(int action_space = kActionSpace);
 
   // save q-learning
-  void Save(const std::string &data_file = "./q_learning.data");
+  void Save(const std::string &data_file = "./q_learning.json");
 
   // load q-learning
-  void Load(const std::string &data_file = "./q_learning.data");
+  void Load(const std::string &data_file = "./q_learning.json");
 
 protected:
   double gamma_{0.9};  // gamma in bellman function, how you value future
