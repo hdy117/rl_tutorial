@@ -161,7 +161,7 @@ void QLearning::Optimize(double epsilon, int max_steps) {
       for (auto action_i = 0; action_i < kActionSpace; ++action_i) {
         // next state with current state-action
         auto q_s_a = cur_cell.qualities(action_i);
-        if (q_s_a >= max_q_s_a) {
+        if (q_s_a > max_q_s_a) {
           max_q_s_a = q_s_a;
           chosen_action = action_i;
         }
