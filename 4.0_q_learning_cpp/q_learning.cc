@@ -157,7 +157,7 @@ void QLearning::Optimize(double epsilon, int max_steps) {
       chosen_action = RandomAction(kActionSpace);
     } else {
       // select best action based on current q_s_a
-      double max_q_s_a = kBoardQuality;
+      double max_q_s_a = cur_cell.qualities(chosen_action);
       for (auto action_i = 0; action_i < kActionSpace; ++action_i) {
         // next state with current state-action
         auto q_s_a = cur_cell.qualities(action_i);
@@ -185,6 +185,10 @@ void QLearning::Optimize(double epsilon, int max_steps) {
 
     // max_next_q_s_a
     double max_next_q_s_a = q_table_->MaxQualityOf(next_cell);
+    if (!ret) {
+      // penaulty to cross boarder
+      max_next_q_s_a = kBoardQuality;
+    }
     // update quality of this state-action, reward + arg max(Q(s',a')) vs a'
     double bellman_target = next_cell.reward() + gamma_ * max_next_q_s_a;
     double q_s_a = cur_cell.qualities(chosen_action); //  Q(s,a)

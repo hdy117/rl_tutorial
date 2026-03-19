@@ -32,15 +32,15 @@ const int kCols = 128;
 // cell type (alias for proto enum)
 using CellType = qlearning::CellType;
 namespace cell_reward {
-const double TrapCellReward = -1e2;
+const double TrapCellReward = -1;
 const double NormalCellReward = 0.0;
-const double BingoCellReward = 1e2;
+const double BingoCellReward = 1;
 } // namespace cell_reward
 
 // initial quality of q(s,a)， negative quality will speed up find shortest path
 // although gamma will help to find shortest path
 const double kInitialQuality = 0.0;
-const double kBoardQuality = -1e3;
+const double kBoardQuality = -1e1;
 
 // alias for proto-generated types
 using QCellData = qlearning::QCellData;
