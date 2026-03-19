@@ -47,7 +47,7 @@ void OptimizeQLearning() {
 
   // 4.0 optimize
   PrintSeperator();
-  const int kEpoches = 2000;
+  const int kEpoches = 10000;
   double eplison = 1.0;
   const int KMaxSteps = kRows * kCols;
   for (auto i = 0; i < kEpoches; i++) {
