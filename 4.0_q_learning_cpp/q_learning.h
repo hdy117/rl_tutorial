@@ -34,7 +34,8 @@ const double NormalCellReward = 0.0;
 const double BingoCellReward = 1e2;
 } // namespace cell_reward
 
-const double kInitialQuality = -1.0;
+// initial quality of q(s,a)
+const double kInitialQuality = -0.1;
 
 // q-cell data
 struct QCellData {
