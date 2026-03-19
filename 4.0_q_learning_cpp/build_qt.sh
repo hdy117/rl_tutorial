@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR"
 BUILD_DIR="build_qt"
 
 # Setup build directory
-rm -rf "$BUILD_DIR"
+# rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
