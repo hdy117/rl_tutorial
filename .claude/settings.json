@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./build.sh)",
+      "Bash(./build/qlearning 1)",
+      "Bash(python -:*)",
+      "Bash(./build/qlearning)"
+    ]
+  }
+}

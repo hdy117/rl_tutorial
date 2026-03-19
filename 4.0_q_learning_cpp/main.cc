@@ -64,7 +64,7 @@ void OptimizeQLearning() {
 
 int main(int argc, char *argv[]) {
   // QLearningUnitTest();
-  int if_optimize = 0;
+  int if_optimize = 1;
 
   if (argc == 2) {
     if_optimize = std::stoi(argv[1]);
