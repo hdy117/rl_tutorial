@@ -40,7 +40,7 @@ void OptimizeQLearning() {
 
   // 3.0 q-learning
   PrintSeperator();
-  double gamma = 0.9, learning_rate = 0.01;
+  double gamma = 0.9, learning_rate = 0.1;
   QLearning q_learning(gamma, learning_rate);
   q_learning.AcceptQTable(q_table);
   LOG_INFO << "build q-learning.\n";
