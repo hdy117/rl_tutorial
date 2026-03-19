@@ -108,7 +108,7 @@ public:
 
 class QLearning {
 public:
-  QLearning(double gamma = 0.9, double alpha = 0.01)
+  QLearning(double gamma = 0.9, double alpha = 0.1)
       : gamma_(gamma), alpha_(alpha) {}
 
 public:

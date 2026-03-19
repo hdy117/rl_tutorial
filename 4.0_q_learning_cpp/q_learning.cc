@@ -149,6 +149,7 @@ void QLearning::Optimize(double epsilon, int max_steps) {
     // random eplison
     auto cur_epsilon = Random01();
     LOG_INFO << "cur_epsilon:" << cur_epsilon << ", eplison:" << epsilon;
+    int next_r = cur_r, next_c = cur_c;
 
     // make an action with epslison used
     if (cur_epsilon < epsilon) {
@@ -158,8 +159,8 @@ void QLearning::Optimize(double epsilon, int max_steps) {
       auto ret = q_table_->UpdateCellWithAction(r, c, random_action_i);
       if (ret) {
         // action with random action
-        cur_r = r;
-        cur_c = c;
+        next_r = r;
+        next_c = c;
         best_action = random_action_i;
       }
     } else {
@@ -178,14 +179,14 @@ void QLearning::Optimize(double epsilon, int max_steps) {
       // action among current best q_s_a
       int r = cur_r, c = cur_c;
       if (q_table_->UpdateCellWithAction(r, c, best_action)) {
-        cur_r = r;
-        cur_c = c;
+        next_r = r;
+        next_c = c;
       }
     }
 
     // get next cell
-    LOG_INFO << "current cell r:" << cur_r << ", c:" << cur_c << "\n";
-    const auto &next_cell = q_table_->MutableCellData(cur_r, cur_c);
+    LOG_INFO << "next cell r:" << next_r << ", c:" << next_c << "\n";
+    const auto &next_cell = q_table_->MutableCellData(next_r, next_c);
 
     // max_next_q_s_a
     double max_next_q_s_a = kBoardQuality;
@@ -202,6 +203,10 @@ void QLearning::Optimize(double epsilon, int max_steps) {
     double q_s_a = cur_cell.qualities(best_action); //  Q(s,a)
     double td_error = bellman_target - q_s_a;
     cur_cell.set_qualities(best_action, q_s_a + alpha_ * td_error);
+
+    // update r,c
+    cur_r = next_r;
+    cur_c = next_c;
   }
 }
 
