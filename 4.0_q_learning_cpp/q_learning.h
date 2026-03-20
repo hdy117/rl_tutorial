@@ -26,14 +26,14 @@ const int kActionNoMove = 4;
 } // namespace action
 
 // one table that agent can move
-const int kRows = 64;
-const int kCols = 128;
+const int kRows = 32;
+const int kCols = 64;
 
 // cell type (alias for proto enum)
 using CellType = qlearning::CellType;
 namespace cell_reward {
 const double TrapCellReward = -1e5;
-const double NormalCellReward = 0.0;
+const double NormalCellReward = -1.0;
 const double BingoCellReward = 1e5;
 } // namespace cell_reward
 

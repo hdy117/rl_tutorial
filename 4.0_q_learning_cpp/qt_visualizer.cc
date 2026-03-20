@@ -16,6 +16,7 @@
 #include <QGridLayout>
 #include <QResizeEvent>
 #include <cmath>
+#include <algorithm>
 
 #include <google/protobuf/util/json_util.h>
 #include "q_learning.pb.h"
@@ -50,6 +51,9 @@ public:
   int rows = 0;
   int cols = 0;
   std::vector<std::vector<CellData>> grid;
+  double global_min_q = 0.0;
+  double global_max_q = 1.0;
+  std::vector<double> all_q_values; // Store all Q values for percentile calculation
   
   bool load(const QString& filepath) {
     QFile file(filepath);
@@ -87,40 +91,66 @@ public:
       }
     }
     
+    // Calculate global min/max Q values for color mapping
+    computeGlobalQRange();
+    
     return true;
+  }
+  
+  // Compute global min/max Q values across all cells
+  void computeGlobalQRange() {
+    all_q_values.clear();
+    global_min_q = 1e9;
+    global_max_q = -1e9;
+    for (int r = 0; r < rows; ++r) {
+      for (int c = 0; c < cols; ++c) {
+        for (double q : grid[r][c].qualities) {
+          global_min_q = std::min(global_min_q, q);
+          global_max_q = std::max(global_max_q, q);
+          all_q_values.push_back(q);
+        }
+      }
+    }
+    std::sort(all_q_values.begin(), all_q_values.end());
+    // Ensure reasonable range
+    if (global_max_q <= global_min_q) {
+      global_max_q = global_min_q + 1.0;
+    }
+  }
+  
+  // Get percentile of a Q value (0.0 = lowest, 1.0 = highest)
+  double getPercentile(double q) const {
+    if (all_q_values.empty()) return 0.5;
+    auto it = std::lower_bound(all_q_values.begin(), all_q_values.end(), q);
+    return static_cast<double>(it - all_q_values.begin()) / all_q_values.size();
   }
   
   // Get color based on max Q value (heatmap style)
   QColor getHeatmapColor(double max_q) const {
-    // Normalize Q value to 0-1 range
-    // Assuming Q values roughly range from -1000 to +100
-    double min_q = -500;
-    double max_val = 100;
-    double normalized = (max_q - min_q) / (max_val - min_q);
-    normalized = std::max(0.0, std::min(1.0, normalized));
+    // Use percentile for better distribution spread
+    double percentile = getPercentile(max_q);
     
-    // Heatmap: blue (cold/low) -> green -> yellow -> red (hot/high)
+    // Apply sigmoid-like transformation to stretch mid-range values
+    // This makes differences in the middle more visible
+    double normalized = std::pow(percentile, 0.6);
+    
+    // White to Deep Green gradient with high contrast
+    // Low Q:  RGB(255, 255, 255) - pure white
+    // Mid Q:  RGB(150, 230, 150) - light green
+    // High Q: RGB(0, 100, 0)     - deep dark green
     int r, g, b;
-    if (normalized < 0.25) {
-      // Blue to Cyan
-      r = 0;
-      g = (int)(255 * normalized * 4);
-      b = 255;
-    } else if (normalized < 0.5) {
-      // Cyan to Green
-      r = 0;
-      g = 255;
-      b = (int)(255 * (1 - (normalized - 0.25) * 4));
-    } else if (normalized < 0.75) {
-      // Green to Yellow
-      r = (int)(255 * (normalized - 0.5) * 4);
-      g = 255;
-      b = 0;
+    if (normalized < 0.5) {
+      // White to light green
+      double t = normalized * 2; // 0 to 1
+      r = (int)(255 - 105 * t);
+      g = (int)(255 - 25 * t);
+      b = (int)(255 - 105 * t);
     } else {
-      // Yellow to Red
-      r = 255;
-      g = (int)(255 * (1 - (normalized - 0.75) * 4));
-      b = 0;
+      // Light green to deep green
+      double t = (normalized - 0.5) * 2; // 0 to 1
+      r = (int)(150 * (1 - t));
+      g = (int)(230 - 130 * t);
+      b = (int)(150 * (1 - t));
     }
     return QColor(r, g, b);
   }
