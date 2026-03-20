@@ -93,12 +93,98 @@ Q^*(s,a) &= \underbrace{\sum_{s'} P(s'|s,a)}_{\text{状态转移概率}} \times 
 \end{aligned}
 ```
 
+### 环境模型到底是什么？（新增）
+
+在深入矛盾之前，先明确一个关键概念：**什么是"环境模型"？**
+
+#### 🔍 环境模型的完整定义
+
+**环境模型 (Environment Model)** = 环境的动力学规律 + 奖励函数结构
+
+用 MDP 术语拆解：
+
+```text
+环境模型 = {P, R}
+
+其中:
+- P(s'|s,a) ∈ [0,1] — "在状态 s 执行动作 a，转移到状态 s'的概率"
+- R(s,a,s') ∈ ℝ     — "从 (s,a) 转移到 s'获得的即时奖励"
+```
+
+**关键特征：**
+
+| 属性 | 说明 |
+|------|------|
+| **完整性** | 描述所有可能的 `(s, a) → (s', r)` 转移 |
+| **确定性/随机性** | P 可以是确定的 (P=1) 或随机的 (概率分布) |
+| **可预测性** | 知道模型就能预测未来状态的分布 |
+
+#### 🔥 从第一原理看：为什么 Bellman 方程需要环境模型？
+
+Bellman Optimality Equation 的本质是**期望计算**：
+
+```math
+Q^*(s,a) = \underbrace{\sum_{s'} P(s'|s,a)}_{\text{对所有可能未来加权}} \left[ R + \gamma \max Q^* \right]
+```
+
+这个 `∑` 符号不是随便写的 — 它意味着：
+
+> **要计算最优价值，需要对所有可能的下一状态求期望。**
+
+**为什么必须求期望？**
+
+因为环境是**随机过程**（stochastic process）：
+- 同一动作在不同时间执行可能产生不同结果
+- Bellman 方程给出的是"长期平均最优值"
+- 平均值需要知道分布才能计算
+
+#### 📊 具体例子：环境模型的必要性
+
+假设你在状态 `A`，考虑向右走 `→`：
+
+**有模型的情况（Model-based）：**
+```text
+已知:
+- P(B|A,→) = 0.8    ← 向右走有 80% 概率到 B
+- P(C|A,→) = 0.2    ← 向右走有 20% 概率掉坑 C
+- R(A,→,B) = -0.1   ← 到 B 消耗一点能量
+- R(A,→,C) = -10    ← 掉坑了，大 penalty
+
+计算:
+Q^*(A,→) = 0.8 × [-0.1 + γ max Q(B)] + 0.2 × [-10 + γ max Q(C)]
+         = -0.08 + 0.8γ max Q(B) - 2.0 + 0.2γ max Q(C)
+```
+
+**没有模型的情况（Model-free）：**
+```text
+未知:
+- P(B|A,→) = ?      ← 不知道向右走会怎样
+- P(C|A,→) = ?      ← 可能掉坑，也可能不会
+- R(A,→,?) = ?      ← 奖励分布完全未知
+
+只能得到:
+- 单次交互结果：(r=-0.1, s'=B)   ← 只是某个样本
+- 没法求和 ∑             ← 不知道所有可能的结果及其概率
+```
+
+> **关键区别：** Model-based 知道"每种结果发生的概率"，Model-free 只知道"这次发生了什么"。
+
+#### 🔥 本质矛盾：环境的随机性 vs 我们的知识状态
+
+| 场景 | 是否有模型 | 能否计算期望 | 方法 |
+|------|-----------|-------------|------|
+| Model-based | ✅ 知道 P(s'|s,a) | ✅ 可以直接求和 | Dynamic Programming (DP) |
+| Model-free | ❌ 不知道 P(s'|s,a) | ❌ 只能采样估计 | Q-Learning / Policy Gradient |
+
+**所以 Q-Learning 的本质：**
+
+> **在不知道环境随机性的情况下，用单次交互的样本去估计期望价值。**
+
+这就是从 `E[r + γ max Q]`（需要模型）变成 `r + γ max Q`（单次采样）的关键跳跃。
+
 ### 无法执行的地方
 
 这个式子有个**致命问题**：右边的 `P(s'|s,a)` 和 `R(s,a,s')` **未知**。
-
-- `P(s'|s,a)` = "在 s 做 a，转移到 s' 的概率" —— 这是环境的**动力学模型**
-- `R(s,a,s')` = "从 (s,a) 到 s' 的奖励分布" —— 这也是环境的一部分
 
 **可现实里我们不知道这些！**
 
@@ -552,6 +638,72 @@ Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 4. TD error 驱动更新 → 向更合理的目标靠近
 5. 状态太大时 Q-table 不够用 → DQN 出场
 
+---
+
+---
+
+## 🔧 核心代码实现（C++11）
+
+### 📊 Q-Table 数据结构可视化
+
+在深入代码之前，先看一张图理解 Q-table 的结构：
+
+```
+Q-Learning Agent Data Structure
+═══════════════════════════════════════
+
+q_table (vector<StateQValues>)
+│
+├── State 0: [QValue, QValue, QValue]   ← n_actions
+│       │        │        │
+│       ├─value ──0.12     最优动作 →
+│       ├─visits─15         (exploit)
+│       │
+├── State 1: [QValue, QValue, QValue]   ← n_actions
+│       │        │        │
+│       ├─value ──0.87     ← 当前最优
+│       ├─visits─43         (exploit)
+│       │
+├── State 2: [QValue, QValue, QValue]   ← n_actions
+│       │        │        │
+│       ├─value ──0.05     ← 低价值，少访问
+│       ├─visits─3          (可能未被充分探索)
+│
+└── ...
+
+QValue Structure:
+┌────────────────────┐
+│ value: double      │ ← Q(s,a) 的当前估计
+│ visits: int        │ ← 这个状态 - 动作对被更新了多少次
+└────────────────────┘
+
+Access Pattern:
+q_table[state].actions[action].value  → Get Q(s,a)
+q_table[state].actions[action].visits → How many times updated
+```
+
+### 💡 关键代码解读
+
+| 函数 | 对应理论概念 |
+|------|-------------|
+| `select_action()` | Epsilon-greedy → 探索 vs 利用的平衡 |
+| `update()` | Q-Learning update formula → Bellman Optimality 的样本版本 |
+| `decay_epsilon()` | Training schedule → 前期多探索，后期收敛 |
+
+### 🔥 核心公式在代码中的位置
+
+```cpp
+// Line in update(): target = r + γ * max Q(s', a')
+double target = reward + gamma * max_next_q;
+
+// TD Error: 新证据 - 旧估计
+double td_error = target - q_table[state][action];
+
+// Update towards the target (sample mean approximation)
+q_table[state][action] += alpha * td_error;
+```
+
+这就是整个 Q-Learning 的核心！🔥
 ---
 
 *下一章：DQN — 当状态空间爆炸，神经网络如何接管 Q-Learning？*
