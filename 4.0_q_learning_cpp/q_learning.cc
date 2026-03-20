@@ -178,7 +178,7 @@ void QLearning::Optimize(double epsilon, int max_steps) {
     int r = cur_r, c = cur_c;
     auto ret = q_table_->UpdateCellWithAction(r, c, chosen_action);
     double max_next_q_s_a = kBoardQuality;
-    double rewart_t_1 = cell_reward::TrapCellReward;
+    double rewart_t_plus_1 = cell_reward::TrapCellReward;
     if (ret) {
       // action with random action
       next_r = r;
@@ -186,7 +186,7 @@ void QLearning::Optimize(double epsilon, int max_steps) {
 
       const auto &next_cell = q_table_->MutableCellData(next_r, next_c);
       max_next_q_s_a = q_table_->MaxQualityOf(next_cell);
-      rewart_t_1 = next_cell.reward();
+      rewart_t_plus_1 = next_cell.reward();
 
       LOG_INFO << "next cell r:" << next_r << ", c:" << next_c << "\n";
       LOG_INFO << "chosen_action:" << chosen_action
@@ -194,11 +194,11 @@ void QLearning::Optimize(double epsilon, int max_steps) {
     } else {
       // penaulty to cross boarder
       max_next_q_s_a = kBoardQuality;
-      rewart_t_1 = cell_reward::TrapCellReward;
+      rewart_t_plus_1 = cell_reward::TrapCellReward;
     }
 
     // update quality of this state-action, reward + arg max(Q(s',a')) vs a'
-    double bellman_target = rewart_t_1 + gamma_ * max_next_q_s_a;
+    double bellman_target = rewart_t_plus_1 + gamma_ * max_next_q_s_a;
     double q_s_a = cur_cell.qualities(chosen_action); //  Q(s,a)
     double td_error = bellman_target - q_s_a;
     cur_cell.set_qualities(chosen_action, q_s_a + alpha_ * td_error);
