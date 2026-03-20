@@ -41,18 +41,25 @@ void OptimizeQLearning(bool resume = false) {
     q_learning.Load(kModelPath);
     LOG_INFO << "Resumed from existing model: " << kModelPath << "\n";
   } else {
+    // max trap cell
+    const int kNumTrapCells = 128;
+
     // Build new q table
     QTablePtr q_table = std::make_shared<QTable>();
     q_table->InitializeTable(kRows, kCols);
 
+    // accept q table
+    q_learning.AcceptQTable(q_table);
+
     // Set trap and bingo cells
-    q_table->UpdateCellType(23, 48, qlearning::TRAP_CELL);
-    q_table->UpdateCellType(4, 51, qlearning::TRAP_CELL);
-    q_table->UpdateCellType(36, 67, qlearning::TRAP_CELL);
-    q_table->UpdateCellType(30, 100, qlearning::TRAP_CELL);
+    for (auto i = 0; i < kNumTrapCells; ++i) {
+      int r = 0, c = 0;
+      q_learning.RandomRowCol(r, c);
+      q_table->UpdateCellType(r, c, qlearning::TRAP_CELL);
+    }
+
     q_table->UpdateCellType(kRows - 1, kCols - 1, qlearning::BINGO_CELL);
 
-    q_learning.AcceptQTable(q_table);
     LOG_INFO << "Initialized new Q-table.\n";
   }
 
