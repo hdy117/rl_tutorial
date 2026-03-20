@@ -93,6 +93,20 @@ double QTable::MaxQualityOf(const QCellData &cell) {
   return best_quality;
 }
 
+// get action of max quality of cell state-actions
+int QTable::ActionOfMaxQualityOf(const QCellData &cell) {
+  // best quality if among this state-actions
+  double best_quality = -1e9;
+  int best_quality_action = action::kActionNoMove;
+  for (auto action_i = 0; action_i < kActionSpace; action_i++) {
+    if (cell.qualities(action_i) > best_quality) {
+      best_quality = cell.qualities(action_i);
+      best_quality_action = action_i;
+    }
+  }
+  return best_quality_action;
+}
+
 // random r, c
 void QLearning::RandomRowCol(int &r, int &c) {
   static std::random_device rd;
@@ -157,40 +171,34 @@ void QLearning::Optimize(double epsilon, int max_steps) {
       chosen_action = RandomAction(kActionSpace);
     } else {
       // select best action based on current q_s_a
-      double max_q_s_a = cur_cell.qualities(chosen_action);
-      for (auto action_i = 0; action_i < kActionSpace; ++action_i) {
-        // next state with current state-action
-        auto q_s_a = cur_cell.qualities(action_i);
-        if (q_s_a > max_q_s_a) {
-          max_q_s_a = q_s_a;
-          chosen_action = action_i;
-        }
-      }
+      chosen_action = q_table_->ActionOfMaxQualityOf(cur_cell);
     }
 
     // update chosen next cell
     int r = cur_r, c = cur_c;
     auto ret = q_table_->UpdateCellWithAction(r, c, chosen_action);
+    double max_next_q_s_a = kBoardQuality;
+    double rewart_t_1 = cell_reward::TrapCellReward;
     if (ret) {
       // action with random action
       next_r = r;
       next_c = c;
+
+      const auto &next_cell = q_table_->MutableCellData(next_r, next_c);
+      max_next_q_s_a = q_table_->MaxQualityOf(next_cell);
+      rewart_t_1 = next_cell.reward();
+
+      LOG_INFO << "next cell r:" << next_r << ", c:" << next_c << "\n";
       LOG_INFO << "chosen_action:" << chosen_action
                << ", max_q_s_a:" << cur_cell.qualities(chosen_action) << "\n";
-    }
-
-    // get next cell
-    LOG_INFO << "next cell r:" << next_r << ", c:" << next_c << "\n";
-    const auto &next_cell = q_table_->MutableCellData(next_r, next_c);
-
-    // max_next_q_s_a
-    double max_next_q_s_a = q_table_->MaxQualityOf(next_cell);
-    if (!ret) {
+    } else {
       // penaulty to cross boarder
       max_next_q_s_a = kBoardQuality;
+      rewart_t_1 = cell_reward::TrapCellReward;
     }
+
     // update quality of this state-action, reward + arg max(Q(s',a')) vs a'
-    double bellman_target = next_cell.reward() + gamma_ * max_next_q_s_a;
+    double bellman_target = rewart_t_1 + gamma_ * max_next_q_s_a;
     double q_s_a = cur_cell.qualities(chosen_action); //  Q(s,a)
     double td_error = bellman_target - q_s_a;
     cur_cell.set_qualities(chosen_action, q_s_a + alpha_ * td_error);
@@ -300,7 +308,11 @@ void QLearning::Pi(int r, int c, int max_steps) {
              << ", best_q_s_a:" << best_q_s_a << "\n";
 
     // act
-    q_table_->UpdateCellWithAction(cur_r, cur_c, chosen_action);
+    int r = cur_r, c = cur_c;
+    if (q_table_->UpdateCellWithAction(r, c, chosen_action)) {
+      cur_r = r;
+      cur_c = c;
+    }
 
     // update step counter
     step_counter++;
