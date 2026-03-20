@@ -2,6 +2,10 @@
 
 本文件为 AI 编程助手提供项目背景、构建指令和工作约定。
 
+## 用户学习方法
+- Preferred default learning spine: `problem -> starting point -> invention -> verification -> example`
+- visual learner, 提供视觉化的解释或图表来帮助理解
+
 ## 项目概述
 
 这是一个**文档优先**的强化学习（Reinforcement Learning）教程项目，采用"问题驱动式第一性理解"方式编写。教程使用中文撰写，包含 19 个章节，涵盖从经典 RL（Q-Learning、DQN、PPO）到 LLM 对齐（RLHF、GRPO）的完整学习路径。
