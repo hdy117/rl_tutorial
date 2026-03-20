@@ -90,26 +90,90 @@ public:
     return true;
   }
   
-  QColor getCellColor(int r, int c) const {
+  // Get color based on max Q value (heatmap style)
+  QColor getHeatmapColor(double max_q) const {
+    // Normalize Q value to 0-1 range
+    // Assuming Q values roughly range from -1000 to +100
+    double min_q = -500;
+    double max_val = 100;
+    double normalized = (max_q - min_q) / (max_val - min_q);
+    normalized = std::max(0.0, std::min(1.0, normalized));
+    
+    // Heatmap: blue (cold/low) -> green -> yellow -> red (hot/high)
+    int r, g, b;
+    if (normalized < 0.25) {
+      // Blue to Cyan
+      r = 0;
+      g = (int)(255 * normalized * 4);
+      b = 255;
+    } else if (normalized < 0.5) {
+      // Cyan to Green
+      r = 0;
+      g = 255;
+      b = (int)(255 * (1 - (normalized - 0.25) * 4));
+    } else if (normalized < 0.75) {
+      // Green to Yellow
+      r = (int)(255 * (normalized - 0.5) * 4);
+      g = 255;
+      b = 0;
+    } else {
+      // Yellow to Red
+      r = 255;
+      g = (int)(255 * (1 - (normalized - 0.75) * 4));
+      b = 0;
+    }
+    return QColor(r, g, b);
+  }
+  
+  // Get color based on best action direction
+  QColor getDirectionalColor(int best_action) const {
+    // Directional colors: Up=Red, Down=Blue, Left=Green, Right=Yellow, NoMove=Gray
+    switch (best_action) {
+      case ACTION_UP:    return QColor(255, 100, 100); // Red-ish
+      case ACTION_DOWN:  return QColor(100, 100, 255); // Blue-ish
+      case ACTION_LEFT:  return QColor(100, 200, 100); // Green-ish
+      case ACTION_RIGHT: return QColor(255, 200, 100); // Orange/Yellow-ish
+      default:           return QColor(180, 180, 180); // Gray
+    }
+  }
+  
+  QColor getCellColor(int r, int c, bool use_directional = false) const {
     const auto& cell = grid[r][c];
     if (cell.cell_type == qlearning::BINGO_CELL) {
-      return QColor(100, 200, 100); // Green for bingo
+      return QColor(50, 180, 50);   // Deep green for bingo
     } else if (cell.cell_type == qlearning::TRAP_CELL) {
-      return QColor(200, 100, 100); // Red for trap
+      return QColor(180, 50, 50);   // Deep red for trap
     }
     
-    // Normal cell - shade based on max quality
+    // Normal cell
     double max_q = -1e9;
-    for (double q : cell.qualities) {
-      max_q = std::max(max_q, q);
+    int best_action = 4; // Default to NoMove
+    for (int i = 0; i < (int)cell.qualities.size() && i < 5; ++i) {
+      if (cell.qualities[i] > max_q) {
+        max_q = cell.qualities[i];
+        best_action = i;
+      }
     }
     
-    // Normalize to 0-255 for blue intensity
-    int intensity = 200;
-    if (max_q > -1000) {
-      intensity = std::min(255, std::max(100, 200 + (int)(max_q * 50)));
+    if (use_directional) {
+      return getDirectionalColor(best_action);
+    } else {
+      return getHeatmapColor(max_q);
     }
-    return QColor(240, 240, intensity);
+  }
+  
+  // Get best action index for a cell
+  int getBestAction(int r, int c) const {
+    const auto& cell = grid[r][c];
+    double max_q = -1e9;
+    int best_action = 4;
+    for (int i = 0; i < (int)cell.qualities.size() && i < 5; ++i) {
+      if (cell.qualities[i] > max_q) {
+        max_q = cell.qualities[i];
+        best_action = i;
+      }
+    }
+    return best_action;
   }
   
   static QString cellTypeString(qlearning::CellType type) {
@@ -392,6 +456,40 @@ protected:
     }
   }
   
+  void drawArrow(QPainter& painter, int cx, int cy, int action, int size) {
+    // Calculate arrow angle based on action
+    double angle = 0;
+    switch (action) {
+      case ACTION_UP:    angle = -90; break;
+      case ACTION_DOWN:  angle = 90; break;
+      case ACTION_LEFT:  angle = 180; break;
+      case ACTION_RIGHT: angle = 0; break;
+      default: return; // No arrow for NoMove
+    }
+    
+    painter.save();
+    painter.translate(cx, cy);
+    painter.rotate(angle);
+    
+    // Arrow color - white with black outline for visibility
+    painter.setPen(QPen(Qt::black, 1));
+    painter.setBrush(Qt::white);
+    
+    // Draw arrow
+    int len = size * 0.4;
+    int head = size * 0.25;
+    
+    QPointF points[3] = {
+      QPointF(len, 0),
+      QPointF(len - head, -head/2),
+      QPointF(len - head, head/2)
+    };
+    painter.drawPolygon(points, 3);
+    painter.drawLine(-len/2, 0, len - head, 0);
+    
+    painter.restore();
+  }
+  
   void paintEvent(QPaintEvent* event) override {
     Q_UNUSED(event);
     
@@ -408,21 +506,31 @@ protected:
       for (int c = 0; c < data_->cols; ++c) {
         QRect cellRect(c * cellWidth_, r * cellHeight_, cellWidth_, cellHeight_);
         
-        // Fill cell
-        painter.fillRect(cellRect, data_->getCellColor(r, c));
+        // Fill cell with heatmap color
+        painter.fillRect(cellRect, data_->getCellColor(r, c, false));
         
         // Draw border
         painter.setPen(QPen(Qt::gray, 1));
         painter.drawRect(cellRect);
         
-        // Draw small indicator for reward if cell is large enough
+        // Draw optimal action arrow if cell is large enough
+        if (cellWidth_ >= 12 && cellHeight_ >= 12) {
+          int best_action = data_->getBestAction(r, c);
+          if (best_action != 4) { // Not NoMove
+            int cx = cellRect.center().x();
+            int cy = cellRect.center().y();
+            int arrow_size = std::min(cellWidth_, cellHeight_) * 0.8;
+            drawArrow(painter, cx, cy, best_action, arrow_size);
+          }
+        }
+        
+        // Draw small indicator for trap/bingo if cell is large enough
         if (cellWidth_ >= 20 && cellHeight_ >= 20) {
           const auto& cell = data_->grid[r][c];
-          if (std::abs(cell.reward) > 0.01) {
-            painter.setPen(Qt::black);
-            int fontSize = std::max(6, std::min(10, cellWidth_ / 3));
-            painter.setFont(QFont("Arial", fontSize));
-            QString text = QString::number(cell.reward, 'f', 0);
+          if (cell.cell_type != qlearning::NORMAL_CELL) {
+            painter.setPen(Qt::white);
+            painter.setFont(QFont("Arial", std::max(6, cellWidth_ / 3), QFont::Bold));
+            QString text = (cell.cell_type == qlearning::BINGO_CELL) ? "G" : "X";
             painter.drawText(cellRect, Qt::AlignCenter, text);
           }
         }
@@ -499,7 +607,7 @@ public:
     mainLayout->setSpacing(5);
     mainLayout->setContentsMargins(5, 5, 5, 5);
     
-    // Toolbar layout - simplified without zoom controls
+    // Toolbar layout
     QHBoxLayout* toolbarLayout = new QHBoxLayout();
     
     // Fullscreen button
@@ -512,7 +620,7 @@ public:
     
     // Grid info label
     gridInfoLabel_ = new QLabel("Grid: -", this);
-    gridInfoLabel_->setStyleSheet("QLabel { padding: 5px 10px; }");
+    gridInfoLabel_->setStyleSheet("QLabel { padding: 5px 10px; font-weight: bold; }");
     toolbarLayout->addWidget(gridInfoLabel_);
     
     mainLayout->addLayout(toolbarLayout);

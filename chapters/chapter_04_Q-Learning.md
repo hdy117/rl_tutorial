@@ -79,14 +79,25 @@ Outcome -> Process -> Verifiable Reward
 第三章的 Bellman 方程告诉我们：
 
 ```math
-Q^*(s,a) = \mathbb{E}[R_{t+1} + \gamma \max_{a'} Q^*(S_{t+1}, a')]
+Q^*(s,a) = \mathbb{E}_{\substack{
+  R_{t+1} \\ 
+  S_{t+1} \\ 
+  \text{from } (s,a)
+}} \left[ \underbrace{R_{t+1}}_{\text{即时奖励}} + \gamma \underbrace{\max_{a'} Q^*(S_{t+1}, a')}_{\text{下一状态的最优动作价值}} \right]
 ```
 
 但这个式子有个**无法执行的问题**：
 
-- `E` 表示期望，要对所有可能的未来轨迹求平均
-- 可现实里我们**不知道环境模型**（转移概率、奖励分布）
+- `E[·]` 表示期望，要对所有可能的未来轨迹求平均（需要环境模型）
+- 可现实里我们**不知道环境模型**（状态转移概率 P(s'|s,a) 和奖励分布 R(s,a,s')）
 - 所以没法精确计算右边的期望
+
+其中：
+- `Q^*(s,a)`：状态s下执行动作a的最优动作价值函数
+- `R_{t+1}`：执行动作a后获得的即时奖励
+- `γ` (gamma)：折扣因子 (0 ≤ γ ≤ 1)，衡量未来奖励的重要性
+- `S_{t+1}`：执行动作a后转移到的下一状态（随机变量）
+- `max_{a'} Q^*(S_{t+1}, a')`：在下一状态S_{t+1}下可获得的最大未来价值
 
 那怎么办？
 
@@ -275,35 +286,35 @@ Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 
 假设当前在状态 `B`，执行动作 `→`：
 
-| 参数 | 值 |
-|------|-----|
-| reward `r` | 0 |
-| 下一状态 | `C` |
-| `max_{a'} Q(C, a')` | 0.90 |
-| `gamma (γ)` | 0.9 |
-| `alpha (α)` | 0.1 |
-| `Q(B, →)`（旧值） | 0.40 |
+| 参数 | 值 | 含义 |
+|------|-----|------|
+| reward `r` | 0 | 执行动作→后获得的即时奖励 |
+| 下一状态 | `C` | 执行动作→后到达的状态 |
+| `max_{a'} Q(C, a')` | 0.90 | 在状态C下所有可能动作中的最大动作价值 |
+| `gamma (γ)` | 0.9 | 折扣因子，衡量未来奖励的重要性 |
+| `alpha (α)` | 0.1 | 学习率，控制更新步长 |
+| `Q(B, →)`（旧值） | 0.40 | 状态B下执行动作→的当前价值估计 |
 
-**Step 1：计算 target**
+**Step 1：计算 target (Bellman target)**
 ```math
-target = r + γ × max_{a'} Q(s', a') = 0 + 0.9 × 0.90 = 0.81
+\underbrace{target}_{目标值} = \underbrace{r}_{即时奖励} + \gamma \underbrace{\times max_{a'} Q(s', a')}_{折扣后的下一状态最大价值} = 0 + 0.9 × 0.90 = 0.81
 ```
 
-**Step 2：计算 TD error**
+**Step 2：计算 TD error (时序差分误差)**
 ```math
-TD error = target - old_Q = 0.81 - 0.40 = 0.41
+\underbrace{TD error}_{时序差分误差} = \underbrace{target}_{目标值} - \underbrace{old_Q}_{当前估计} = 0.81 - 0.40 = 0.41
 ```
 
 **Step 3：更新 Q 值**
 ```math
-Q(B, →) ← 0.40 + 0.1 × 0.41 = 0.441
+\underbrace{Q(B, →)}_{新估计} \leftarrow \underbrace{0.40}_{旧估计} + \underbrace{0.1}_{学习率 α} × \underbrace{0.41}_{TD error} = 0.441
 ```
 
 **含义：**
 
 - 原来我以为 `B →` 值 `0.40`
-- 新经验告诉我它应该接近 `0.81`
-- 所以往新证据修正一点点，变成 `0.441`
+- 新经验告诉我它应该接近 `0.81`（基于Bellman最优性原理）
+- 所以往新证据修正一点点（受学习率α控制），变成 `0.441`
 
 一次更新只挪一点，但很多次之后，整张 Q-table 就会越来越准。
 
@@ -336,70 +347,7 @@ episode 结束 → 开始下一局
 
 ---
 
-## 8. 对应到代码：`03_q_learning.py` 在做什么？
-
-### 8.1 建环境
-
-```python
-env = gym.make("CartPole-v1")
-```
-
-- 任务是 CartPole（小车杆不倒）
-
-### 8.2 离散化连续状态
-
-CartPole 的观察是连续的：
-- 小车位置 `0.137`
-- 杆角度 `-0.024`
-
-但 Q-table 需要离散索引，所以要 discretize：
-
-```python
-def discretize(state):
-    # 把连续值压到 NUM_BINS 个桶里
-    return (bin1, bin2, bin3, bin4)
-```
-
-### 8.3 初始化 Q-table
-
-```python
-q_table = np.zeros((NUM_BINS, NUM_BINS, NUM_BINS, NUM_BINS, action_size))
-```
-
-- 初始全零，表示"我对所有状态动作都没有经验"
-
-### 8.4 Epsilon-Greedy 选动作
-
-```python
-def choose_action(state, epsilon):
-    if random() < epsilon:
-        return random_action()  # 探索
-    else:
-        return argmax(q_table[state])  # 利用
-```
-
-- 前期多随机试错，后期多相信自己学到的东西
-
-### 8.5 Q-Learning Update
-
-```python
-old_q = q_table[state][action]
-next_max = np.max(q_table[next_state])
-target = reward + GAMMA * next_max
-q_table[state][action] = old_q + ALPHA * (target - old_q)
-```
-
-- 和公式一一对应：`Q ← Q + α(target - Q)`
-
-### 8.6 Epsilon Decay
-
-```python
-epsilon = max(EPSILON_END, epsilon * EPSILON_DECAY)
-```
-
-- 开始多探索，逐渐减少随机性
-
----
+### 8.0 建环境
 
 ## 🔥 独立重构练习（藏起答案再试一次）
 
