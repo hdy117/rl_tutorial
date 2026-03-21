@@ -344,21 +344,32 @@ Env --s--►查表--►Q(s,·)               Env --s--►Network--►Q(s,·;θ)
 | **空间复杂度** | O(\|S\|×\|A\|)             | O(参数量 θ) (固定，与 \|S\|无关) |
 | **泛化能力** | ❌ 无（未见状态返回初始值）      | ✅ 有（相似输入→相似输出）       |
 
-> **核心洞察：** 神经网络把"查表问题"变成了"函数拟合问题"。Q-Table 是离散映射，神经网络是连续曲面拟合。
+```
+### **核心洞察：** 神经网络把"查表问题"变成了"函数拟合问题"。Q-Table 是离散映射，神经网络是连续曲面拟合。
 
 ---
 
-## 三、Invention：DQN 如何从第一原理推导？
+### 三、Invention：DQN 如何从第一原理推导？
 
 ### Step 1: Axioms（不可约的事实）
 
 **公理 1**: Q-Learning 的 Bellman Target 是 RL 收敛的核心
-$$y = r + \gamma \max_{a'}Q(s',a')$$
+
+```math
+y = r + \gamma \max_{a'} Q(s', a')
+```
 
 **公理 2**: 神经网络可以拟合任意连续函数（Universal Approximation Theorem）
-$$f(x; \theta) \approx g(x), \quad \forall g \text{ (足够复杂的网络)}$$
 
-**公理 3**: Q-Table 本质是离散函数 $Q: S \times A \to \mathbb{R}$
+```math
+f(x; \theta) \approx g(x), \quad \forall g \text{ (足够复杂的网络)}
+```
+
+**公理 3**: Q-Table 本质是离散函数
+
+```math
+Q: S \times A \to \mathbb{R}
+```
 
 **这个公理的深层含义：**
 

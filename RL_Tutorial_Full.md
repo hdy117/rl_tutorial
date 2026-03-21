@@ -957,7 +957,7 @@ Q^*(A,→) = \sum_{s'} P(s'|A,→) [R(A,→,s') + \gamma \max_{a'} Q^*(s', a')]
 **然后才能算：**
 ```math
 \begin{aligned}
-Q^*(A,→) &= 0.8 	imes [-0.1 + \gamma \max Q(B)] + 0.2 	imes [-10 + \gamma \max Q(C)] \\
+Q^*(A,→) &= 0.8 \times [-0.1 + \gamma \max Q(B)] + 0.2 \times [-10 + \gamma \max Q(C)] \\
          &= -0.08 + 0.8\gamma \max Q(B) - 2.0 + 0.2\gamma \max Q(C) \\
          &= -2.08 + \gamma [0.8 \max Q(B) + 0.2 \max Q(C)]
 \end{aligned}
@@ -1251,7 +1251,7 @@ Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 
 **Step 1：计算 target (Bellman target)**
 ```math
-\underbrace{target}_{目标值} = \underbrace{r}_{即时奖励} + \gamma \underbrace{\times max_{a'} Q(s', a')}_{折扣后的下一状态最大价值} = 0 + 0.9 × 0.90 = 0.81
+\underbrace{target}_{目标值} = \underbrace{r}_{即时奖励} + \gamma \underbrace{\times max_{a'} Q(s', a')}_{折扣后的下一状态最大价值} = 0 + 0.9 \times 0.90 = 0.81
 ```
 
 **Step 2：计算 TD error (时序差分误差)**
@@ -1261,7 +1261,7 @@ Q(s,a) \leftarrow Q(s,a) + \alpha [r + \gamma \max_{a'}Q(s',a') - Q(s,a)]
 
 **Step 3：更新 Q 值**
 ```math
-\underbrace{Q(B, →)}_{新估计} \leftarrow \underbrace{0.40}_{旧估计} + \underbrace{0.1}_{学习率 α} × \underbrace{0.41}_{TD error} = 0.441
+\underbrace{Q(B, →)}_{新估计} \leftarrow \underbrace{0.40}_{旧估计} + \underbrace{0.1}_{学习率 α} \times \underbrace{0.41}_{TD error} = 0.441
 ```
 
 **含义：**
@@ -1813,12 +1813,22 @@ Env --s--►查表--►Q(s,·)               Env --s--►Network--►Q(s,·;θ)
 ### Step 1: Axioms（不可约的事实）
 
 **公理 1**: Q-Learning 的 Bellman Target 是 RL 收敛的核心
-$$y = r + \gamma \max_{a'}Q(s',a')$$
+
+$$
+y = r + \gamma \max_{a'} Q(s', a')
+$$
 
 **公理 2**: 神经网络可以拟合任意连续函数（Universal Approximation Theorem）
-$$f(x; \theta) \approx g(x), \quad \forall g \text{ (足够复杂的网络)}$$
 
-**公理 3**: Q-Table 本质是离散函数 $Q: S \times A \to \mathbb{R}$
+$$
+f(x; \theta) \approx g(x), \quad \forall g \text{ (足够复杂的网络)}
+$$
+
+**公理 3**: Q-Table 本质是离散函数
+
+$$
+Q: S \times A \to \mathbb{R}
+$$
 
 **这个公理的深层含义：**
 
