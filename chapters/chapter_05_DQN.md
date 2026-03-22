@@ -572,7 +572,7 @@ Filter #16: 某种其他模式
 
 ### 🔍 **为什么这些设计是必然的？**（第一性原理）
 
-### Q1: 输入必须是 s ∈ ℝⁿ？
+#### Q1: 输入必须是 s ∈ ℝⁿ？
 
 ```text
 Axiom: Agent 只能观测状态 s
@@ -584,7 +584,7 @@ Axiom: Agent 只能观测状态 s
     - Neural Network ✅ (函数逼近)
 ```
 
-### Q2: 输出必须是所有动作的 Q 值？
+#### Q2: 输出必须是所有动作的 Q 值？
 
 ```text
 Goal: 选择最优动作 a* = argmaxₐ Q(s,a)
@@ -598,7 +598,7 @@ Goal: 选择最优动作 a* = argmaxₐ Q(s,a)
 结论：必须输出完整向量 [Q(s,a₁), ..., Q(s,aₘ)] ✅
 ```
 
-### Q3: 参数必须是 θ（全局共享）？
+#### Q3: 参数必须是 θ（全局共享）？
 
 ```text
 Goal: 泛化到未见状态
@@ -618,7 +618,7 @@ Goal: 泛化到未见状态
 
 ### 📝 **代码中的对应关系**
 
-### PyTorch QNetwork 示例
+#### PyTorch QNetwork 示例
 
 ```python
 class QNetwork(nn.Module):
