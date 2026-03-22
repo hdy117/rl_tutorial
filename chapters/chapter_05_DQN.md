@@ -653,7 +653,7 @@ total_params = sum(p.numel() for p in model.parameters())
 
 ---
 
-## 🔥 **关键记忆点**
+### 🔥 **关键记忆点**
 
 ```text
 输入：s ∈ ℝⁿ (状态向量，n=4/21168...)
