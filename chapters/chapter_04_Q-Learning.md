@@ -172,9 +172,9 @@ Q^*(A,→) = 0.8 × [-0.1 + γ max Q(B)] + 0.2 × [-10 + γ max Q(C)]
 #### 🔥 本质矛盾：环境的随机性 vs 我们的知识状态
 
 | 场景 | 是否有模型 | 能否计算期望 | 方法 |
-|------|-----------|-------------|------|
-| Model-based | ✅ 知道 P(s'|s,a) | ✅ 可以直接求和 | Dynamic Programming (DP) |
-| Model-free | ❌ 不知道 P(s'|s,a) | ❌ 只能采样估计 | Q-Learning / Policy Gradient |
+|------|------------|--------------|------|
+| Model-based | ✅ 知道 `P(s'\|s,a)` | ✅ 可以直接求和 | Dynamic Programming (DP) |
+| Model-free | ❌ 不知道 `P(s'\|s,a)` | ❌ 只能采样估计 | Q-Learning / Policy Gradient |
 
 **所以 Q-Learning 的本质：**
 
@@ -248,9 +248,9 @@ Q^*(A,→) &= 0.8 \times [-0.1 + \gamma \max Q(B)] + 0.2 \times [-10 + \gamma \m
 **本质：环境的随机性 vs 我们的知识状态**
 
 | 场景 | 是否有模型 | 能否计算期望 | 方法 |
-|------|-----------|-------------|------|
-| Model-based | ✅ 知道 P(s'|s,a) | ✅ 可以直接求和 | Dynamic Programming (DP) |
-| Model-free | ❌ 不知道 P(s'|s,a) | ❌ 只能采样估计 | Q-Learning / Policy Gradient |
+|------|------------|--------------|------|
+| Model-based | ✅ 知道 `P(s'\|s,a)` | ✅ 可以直接求和 | Dynamic Programming (DP) |
+| Model-free | ❌ 不知道 `P(s'\|s,a)` | ❌ 只能采样估计 | Q-Learning / Policy Gradient |
 
 **关键区别：**
 
